@@ -1,0 +1,49 @@
+.result-dock { position:absolute; z-index:25; bottom:24px; left:50%; transform:translateX(-50%); width:min(840px,calc(100vw - 160px)); box-sizing:border-box; max-height:calc(100dvh - 110px); overflow:auto; padding:16px 20px 14px; border:1px solid #e0e5ed; border-radius:20px; background:#fcfdfffa; box-shadow:0 16px 56px #25375314,0 2px 8px #25375306; color:#40516a; backdrop-filter:blur(18px); }
+.refine-heading,.refine-heading>div { display:flex; align-items:center; gap:9px; }
+.refine-heading { justify-content:space-between; margin-bottom:15px; }
+.refine-heading svg { color:#7e8ba2; }
+.refine-heading strong { font-size:var(--text-control,15px); font-weight:600; letter-spacing:.15px; color:#2e3b50; }
+.refine-skill-tag { padding:3px 8px; border:1px solid #e7eaf1; border-radius:6px; background:#f4f6fa; font-size:var(--text-caption,12px); color:#8290a6; }
+.refine-close { display:grid; place-items:center; width:26px; height:26px; padding:0; border:0; border-radius:8px; background:transparent; color:#95a0b1; }
+.refine-close:hover { background:#edf0f6; }
+.refine-context { display:flex; align-items:center; gap:18px; margin-bottom:14px; }
+.refine-current { display:flex; align-items:center; gap:10px; position:relative; min-width:0; max-width:48%; padding-right:18px; border-right:1px solid #e5e9f0; }
+.refine-current>img { display:block; width:48px; height:48px; max-width:48px; flex:0 0 48px; object-fit:contain; border:1px solid #c5d0e0; border-radius:9px; background:#edf1f6; }
+.refine-current>div { display:flex; flex-direction:column; min-width:0; gap:5px; }
+.refine-current>div>span { font-size:var(--text-caption,12px); color:#97a1b1; }
+.refine-current strong { font-size:var(--text-label,13px); font-weight:500; max-width:220px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:#59687e; }
+.refine-selected { position:absolute; bottom:-3px; left:36px; width:14px; height:14px; border:2px solid #fcfdff; border-radius:50%; background:#7897c2; color:white; display:grid; place-items:center; }
+.refine-references { display:flex; align-items:center; gap:12px; min-width:0; }
+.refine-references>span { font-size:var(--text-caption,12px); color:#97a1b1; white-space:nowrap; }
+.refine-references>div { display:flex; gap:6px; overflow-x:auto; padding:2px; }
+.refine-reference { position:relative; flex:0 0 40px; height:40px; }
+.refine-reference>img { display:block; width:40px; height:40px; object-fit:contain; border:1px solid #e2e7ef; border-radius:7px; background:#f0f3f7; }
+.refine-reference>small { position:absolute; right:-2px; bottom:-2px; border:1px solid #e4e8f0; background:#fcfdff; border-radius:4px; font-size:var(--text-micro,11px); line-height:12px; min-width:12px; text-align:center; color:#8a98ad; }
+.refine-no-reference { align-self:center; font-size:var(--text-caption,12px); color:#b0b9c6; }
+.refine-editor { border:1px solid #e3e8f0; border-radius:12px; background:#f6f8fb; transition:background .15s,border-color .15s,box-shadow .15s; }
+.refine-editor:focus-within { background:#fff; border-color:#b2c4df; box-shadow:0 0 0 3px #87a6d00c; }
+.refine-editor textarea { display:block; width:100%; box-sizing:border-box; padding:14px 15px 7px; min-height:86px; max-height:180px; resize:vertical; border:0; outline:none; background:transparent; color:#40516a; font:inherit; font-size:var(--text-body,14px); line-height:1.8; box-shadow:none; }
+.refine-editor textarea::placeholder { color:#a9b3c2; }
+.refine-editor-caption { display:flex; justify-content:space-between; gap:8px; padding:2px 15px 10px; font-size:var(--text-micro,11px); color:#a4aebe; }
+.refine-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:12px; }
+.refine-controls { display:flex; flex-wrap:wrap; align-items:center; gap:5px; min-width:0; }
+.refine-param { display:flex; align-items:center; gap:5px; padding:6px 7px; border:1px solid transparent; border-radius:7px; color:#8a97aa; transition:background .15s; }
+.refine-param:hover { background:#eff3f8; border-color:#e7ebf2; }
+.refine-param>select { min-width:0; max-width:105px; padding:0; border:0; outline:none; background:transparent; color:#748298; font:inherit; font-size:var(--text-caption,12px); cursor:pointer; }
+.refine-model>select { max-width:160px; }
+.refine-param>svg { flex-shrink:0; }
+.refine-submit { flex-shrink:0; display:flex; align-items:center; justify-content:center; gap:7px; min-height:37px; padding:0 12px; border:1px solid #252b37; border-radius:9px; background:#282e3a; color:#fff; font-size:var(--text-label,13px); font-weight:500; box-shadow:0 2px 4px #252b3710; }
+.refine-submit:hover:not(:disabled) { background:#3c4557; transform:translateY(-1px); }
+.refine-submit:disabled { opacity:.4; cursor:default; }
+.refine-count { padding-left:8px; border-left:1px solid #ffffff26; color:#c4cad7; font-size:var(--text-caption,12px); font-variant-numeric:tabular-nums; }
+.refine-task-status { display:flex; align-items:center; gap:6px; margin-top:10px; padding-top:10px; border-top:1px solid #eef1f6; font-size:var(--text-micro,11px); color:#98a5b7; }
+.refine-task-status>span { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.refine-task-status svg { flex-shrink:0; }
+.refine-task-status.is-busy { color:#8099bb; }
+.refine-spinner { animation:refine-spin 1s linear infinite; }
+@keyframes refine-spin { to { transform:rotate(360deg); } }
+@media(max-width:740px) { .result-dock { width:calc(100vw - 90px); left:auto; right:12px; transform:none; padding:13px; bottom:12px; } .refine-footer { flex-wrap:wrap; } .refine-submit { margin-left:auto; } .refine-current { max-width:58%; } .refine-current strong { max-width:120px; } .refine-controls { gap:0; } .refine-context { gap:12px; } }
+@media(prefers-reduced-motion:reduce) { .refine-spinner { animation:none; } }
+.refine-heading-actions { display:flex; align-items:center; gap:10px; }
+.refine-compare { display:flex; align-items:center; gap:5px; padding:5px 8px; border:1px solid #e1e7ef; border-radius:6px; background:#f6f8fb; color:#7d8ea6; font-size:var(--text-caption,12px); }
+.refine-compare:hover { background:#edf2f9; color:#5e7da7; }
