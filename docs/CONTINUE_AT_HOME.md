@@ -2,10 +2,10 @@
 
 ## 1. 拉取与启动
 
-安装 Git、Node.js 22.12+（推荐 24 LTS）、Python 3.11+。用实际仓库地址替换下面的占位符：
+安装 Git、Node.js 22.12+（推荐 24 LTS）、Python 3.11+。仓库为私有，先在家里电脑登录同一个 GitHub 账号：
 
 ```powershell
-git clone <你的仓库地址> visual-workspace
+git clone https://github.com/qq1691995569-droid/visual-workspace.git visual-workspace
 cd visual-workspace
 npm.cmd ci
 py -m venv .venv
