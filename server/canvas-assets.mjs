@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { mkdir, readdir, readFile, unlink, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { atomicJsonWriter } from './atomic-json.mjs'
+import { modelReplacementPlan } from './model-replacement.mjs'
 
 export const assetImage = value => typeof value === 'string' && value.length < 35 * 1024 * 1024 && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value)
 export function selectionPoints(points) {
@@ -95,7 +96,7 @@ function legacyLocalEditPlan(edit) {
 // v3: asset covers are display-only unless the user explicitly chooses image guidance.
 export const usesAssetReference = (kind, region) => kind === 'model' || region.useImageReference === true
 export function localEditImages(base, prepared, edit) {
-  const location=edit.spatialGuidance==='object-outline'?prepared.outline:prepared.mask
+  const location=edit.kind==='model'||edit.spatialGuidance==='object-outline'?prepared.outline:prepared.mask
   if(!location)throw Error('对象定位图生成失败，未提交生图')
   const images = edit.regions ? [base, location, prepared.regionMap] : [base, location]
   if ((edit.regions || [edit]).some(r => usesAssetReference(edit.kind, r))) images.push(edit.regions ? prepared.atlas : edit.asset.image)
@@ -103,6 +104,7 @@ export function localEditImages(base, prepared, edit) {
 }
 export function localEditPlan(edit) {
   const plan = legacyLocalEditPlan(edit)
+  if (edit.kind === 'model') return modelReplacementPlan(plan,edit)
   if (edit.kind !== 'material') return plan
   plan.schemaVersion = 3
   plan.ruleVersion = 'material-prompt-first-v3'

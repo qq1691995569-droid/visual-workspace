@@ -405,7 +405,7 @@ async function handle(method, url, body) {
     const ratio=resolvedRatio.ratio
     const input={mode:'redraw',prompt:JSON.stringify(plan),images:localEditImages(body.base,prepared,body.edit),options:{...body.options,ratio}}
     const request=imageRequest(input,await dreo('GET','/capabilities'))
-    const job={id,type:'generation',feature:'image',fingerprint,ratio,warning:resolvedRatio.warning,localEdit:{...(body.options?.ratio && body.options.ratio!=='auto'?{spatialGuidance:'object-outline'}:{}),base:body.base,points:body.edit.points,strokes:body.edit.strokes,regions:body.edit.regions?.map(r=>({points:r.points,strokes:r.strokes}))},options:{...input.options},status:'queued',message:'局部编辑已排队，选区外将保留原图像素',images:[],createdAt:new Date().toISOString()}
+    const job={id,type:'generation',feature:'image',fingerprint,ratio,warning:resolvedRatio.warning,localEdit:{...(body.edit.kind==='model'||body.options?.ratio && body.options.ratio!=='auto'?{spatialGuidance:'object-outline'}:{}),base:body.base,points:body.edit.points,strokes:body.edit.strokes,regions:body.edit.regions?.map(r=>({points:r.points,strokes:r.strokes}))},options:{...input.options},status:'queued',message:body.edit.kind==='model'?'整件模型替换已排队，按参考替换附件并保留生成尺寸':'局部编辑已排队，选区外将保留原图像素',images:[],createdAt:new Date().toISOString()}
     await mkdir(store,{recursive:true})
     try {await writeFile(idPath(id),JSON.stringify(job),{flag:'wx'})} catch(error) {if(error.code!=='EEXIST') throw error; const existing=await load(id); if(existing.fingerprint!==fingerprint) throw Error('请求 ID 冲突'); return publicJob(existing)}
     void submitImage(job,input,request); return publicJob(job)

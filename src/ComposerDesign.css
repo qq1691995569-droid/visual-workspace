@@ -109,3 +109,5 @@
 .app-shell .creation-dock .composer-reference-hint { margin-left: auto; font-size: 11px; color: #78869a; }
 .app-shell .creation-dock .creation-modes .composer-reference-hint + button { margin-left: 4px; }
 @media (max-width: 600px) { .app-shell .creation-dock .composer-reference-hint { display: none; } }
+
+.app-shell .parameter-popover .parameter-description{font-size:11px;line-height:1.45;color:#8999af;margin:8px 0 0}

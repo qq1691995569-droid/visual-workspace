@@ -59,7 +59,7 @@ export function ToneSkillNode({inputs,state,onChange,onResult}:{
         </label>
       </div>
     })}
-    <small>生成后，点击结果的“滑块对比”微调色彩。</small>
+    <small className="skill-hint">生成后可在“滑块对比”中微调。</small>
     {message&&<p role="status">{message}</p>}
     <button className="primary skill-run" disabled={!base||!reference} onClick={()=>run()}><Play size={14}/>{busy?'调色中…':'一键调色'}</button>
   </fieldset>

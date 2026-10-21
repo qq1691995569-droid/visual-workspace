@@ -40,3 +40,5 @@ aside.collapsed{visibility:hidden;pointer-events:none}
 .skill-body button.skill-binding-card:disabled{cursor:default;opacity:.55}
 
 .skill-binding-heading>span{font-size:var(--text-label,13px);color:#51617e;font-weight:400}
+
+.skill-body .skill-hint,.tone-skill-compact>small.skill-hint{display:block;font-size:11px;line-height:1.45;font-weight:400;color:#8999af;margin:6px 0 10px}

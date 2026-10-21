@@ -1,3 +1,4 @@
+import { previewBatch } from './previewBatch'
 import { pendingTask } from './pendingTask'
 import {ProjectManager} from './ProjectManager'
 import { CanvasImage } from './CanvasImage'
@@ -254,7 +255,7 @@ function Workspace() {
   const [submittingIds,setSubmittingIds]=useState<Set<string>>(new Set())
   const reconnectSucceeded = useRef(false)
   const reconnectSession = useRef(false)
-  const previewImages = nodes.filter(n => n.data.kind === 'image' && n.data.src && !n.data.task && (!n.data.imageJob || n.data.imageOutput))
+  const previewImages = previewBatch(nodes, previewId)
   const previewIndex = previewImages.findIndex(n => n.id === previewId)
   const preview = previewImages[previewIndex]
   const previewBase = nodes.find(n => n.id === (preview?.data.skillResult?.baseId || preview?.data.version?.parentId))

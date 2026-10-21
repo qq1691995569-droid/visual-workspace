@@ -15,7 +15,7 @@ test('资产持久化、去重与损坏文件容错，不把反推候选自动�
 test('局部编辑合同锁定未选像素和机位，材质保形，对象才允许改造型',()=>{
  const edit={kind:'material',target:'沙发表面',asset,points:[[.1,.1],[.8,.1],[.8,.8],[.1,.8]],supplement:'使用灰色，细纹保持'}
  const plan=localEditPlan(edit);assert.match(plan.defaultPreservation.objectGeometry,/保留原形状/);assert.equal(plan.supplement,edit.supplement);assert.match(plan.instructionPriority[0],/用户补充/)
- const model=localEditPlan({...edit,kind:'model',asset:{...asset,kind:'model'}});assert.match(model.locks.objectGeometry,/仅替换指定对象/)
+ const model=localEditPlan({...edit,kind:'model',asset:{...asset,kind:'model'}});assert.match(model.locks.objectGeometry,/按参考替换整件对象/)
  assert.throws(()=>selectionPoints([[0,0],[.5,.5],[1,1]]),/选区过小/);assert.throws(()=>selectionPoints([[-1,0],[1,0],[1,1]]),/有效/);assert.throws(()=>localEditPlan({...edit,kind:'model'}),/参数/)
 })
 test('画布独立反推合同保留不确定项；无有效材质结果时拒绝虚假候选',()=>{

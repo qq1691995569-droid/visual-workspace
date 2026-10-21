@@ -24,7 +24,7 @@ export async function prepareDeferredEdit(job,body,{save,inspect,capabilities,va
   catch(error){throw Error(`对象 ${i+1}（${region.target}）识别失败：${error.message}；尚未提交生图，请调整标记或名称后重试`)}
  }))
  const failure=results.find(r=>r.status==='rejected');if(failure)throw failure.reason
- const regions=results.map(r=>r.value),resolved={...edit,regions,...(edit.kind==='material'?{spatialGuidance:'object-outline'}:{})}
+ const regions=results.map(r=>r.value),resolved={...edit,regions,spatialGuidance:'object-outline'}
  const plan=localEditPlan(resolved);plan.regions.forEach(r=>{r.selectionSource='根据用户点选自动识别的建议范围，生成后需复核'})
  job.resolvedRegions=regions.map(r=>({id:r.id,target:r.name||r.target,points:r.points,polygons:r.polygons,exclusions:r.exclusions,mark:r.mark,confidence:r.confidence,notes:r.notes}))
  await stage(2,'步骤 2/4 · 正在组合对象范围、目标轮廓定位图与编号材质参考')

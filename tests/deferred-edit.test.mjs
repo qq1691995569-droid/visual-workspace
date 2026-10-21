@@ -3,6 +3,20 @@ import assert from 'node:assert/strict'
 import {deferredEdit,prepareDeferredEdit} from '../server/deferred-edit.mjs'
 const asset={kind:'material',name:'织物',image:'data:image/png;base64,AAAA',prompt:'哑光织物',tags:[]}
 const edit={deferredSelection:true,kind:'material',supplement:'仅换材质',regions:[{id:'a',mark:[.2,.2],target:'椅面',asset},{id:'b',mark:[.7,.7],target:'地毯',asset}]}
+test('模型替换按整件资产参考生成，不进入旧轮廓像素贴回路径',async()=>{
+ const modelEdit={...edit,kind:'model',supplement:'替换沙发',regions:[{...edit.regions[0],asset:{...asset,kind:'model',name:'无附件沙发'}}]}
+ const job={}
+ await prepareDeferredEdit(job,{base:'base',edit:modelEdit,options:{}},deps({submit:async(j,input)=>{
+  assert.deepEqual(input.images,['base','outline','map','atlas'])
+  assert.equal(j.localEdit.spatialGuidance,'object-outline')
+  const plan=JSON.parse(input.prompt)
+  assert.equal(plan.ruleVersion,'model-whole-object-v2')
+  assert.match(plan.instructions,/参考资产不带附件/)
+  assert.match(plan.instructions,/旧抱枕、毯子、玩偶等移除/)
+  assert.match(plan.instructions,/接触阴影/)
+  assert.match(plan.locks.unselectedPixels,/不使用旧对象蒙版像素贴回/)
+ }}))
+})
 function deps(overrides={}){return {save:async()=>{},inspect:async()=>({width:1000,height:1000}),capabilities:async()=>({routes:{'conversation-image':{available_routes:[{model:'test',supported_aspects:['1:1','16:9','auto']}]}}}),validate:()=>({params:{}}),locate:async()=>({name:'已识别对象',points:[[.1,.1],[.3,.1],[.3,.3],[.1,.3]]}),prepare:async()=>({mask:'mask',outline:'outline',regionMap:'map',atlas:'atlas'}),submit:async()=>{},...overrides}}
 test('仅标记和资产即可排队，不要求前台等待识别范围',()=>{
  assert.equal(deferredEdit(edit).regions.length,2)
