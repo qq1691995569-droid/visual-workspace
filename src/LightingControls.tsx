@@ -1,3 +1,4 @@
+import { CanvasSelect } from './CanvasSelect'
 import {useId,useState} from 'react'
 import {GripVertical,Plus} from 'lucide-react'
 import type {ReactNode} from 'react'
@@ -43,7 +44,7 @@ export function LightingControls({value,onChange,disabled=false}:{value:Lighting
    const options=key==='weather'?[['keep','沿用'],['sunny','晴天'],['overcast','阴天'],['rainy','雨天']] as const:key==='time'?[['keep','沿用'],['morning','清晨'],['noon','正午'],['afternoon','午后'],['night','夜晚']] as const:key==='exterior'?[['keep','沿用'],['residential','小区'],['city','城市'],['forest','森林'],['ocean','海洋']] as const:key==='sunlight'?[[true,'开启'],[false,'关闭']] as const:key==='mode'?[['optimize','优化'],['reshape','重塑']] as const:key==='lamps'?[['keep','沿用'],['on','开启'],['off','关闭']] as const:[['auto','自动'],['left','左'],['right','右'],['front','前'],['back','后']] as const
    return row(key,labels[key],capsules(key,options))
   })}</div>
-  {!!value.hiddenModules?.length&&<div className="lighting-add"><Plus size={12}/><select aria-label="添加光影模块" value="" onChange={e=>update({hiddenModules:value.hiddenModules?.filter(key=>key!==e.target.value)})}><option value="">添加模块</option>{order.filter(key=>value.hiddenModules?.includes(key)).map(key=><option key={key} value={key}>{labels[key]}</option>)}</select></div>}
+  {!!value.hiddenModules?.length&&<div className="lighting-add"><Plus size={12}/><CanvasSelect aria-label="添加光影模块" value="" onChange={e=>update({hiddenModules:value.hiddenModules?.filter(key=>key!==e.target.value)})}><option value="">添加模块</option>{order.filter(key=>value.hiddenModules?.includes(key)).map(key=><option key={key} value={key}>{labels[key]}</option>)}</CanvasSelect></div>}
   <p>未启用项沿用底图 · 补充说明优先</p>
  </fieldset>
 }

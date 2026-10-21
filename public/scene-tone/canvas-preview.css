@@ -70,3 +70,57 @@ html.canvas-preview,html.canvas-preview body{height:100%;overflow:hidden}
  .canvas-preview #dialogContent .preview-parameters{height:100%;overflow:auto}
  .canvas-preview #dialogContent #previewControls{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
 }
+/* Embedded workbench follows the canvas theme, without filtering image pixels. */
+html.canvas-preview { --tone-panel:light-dark(#eef1f4,#25292e); --tone-field:light-dark(#e7ebef,#1e2227); --tone-ink:light-dark(#263140,#e6ebf3); --tone-muted:light-dark(#627083,#aebaca); --tone-line:light-dark(#d9e0e8,#3a424e); }
+html.canvas-preview body,.canvas-preview #previewDialog,.canvas-preview #dialogContent{background:var(--tone-panel);color:var(--tone-ink)}
+.canvas-preview #dialogContent .preview-layout{gap:16px}
+.canvas-preview #dialogContent .preview-parameters{background:var(--tone-panel);border-color:var(--tone-line);border-radius:20px;padding:18px!important;color:var(--tone-ink)}
+.canvas-preview #dialogContent .preview-parameters::before,.canvas-preview #dialogContent .parameter-control span,.canvas-preview #dialogContent h3{color:var(--tone-ink);font-size:14px}
+.canvas-preview #dialogContent .bar button{background:var(--tone-panel);color:var(--tone-ink);border-color:var(--tone-line);border-radius:22px;min-height:38px;box-shadow:2px 3px 7px light-dark(#aeb9c640,#00000040)}
+.canvas-preview #dialogContent .bar button:last-child{background:light-dark(#293445,#dce6fb);color:light-dark(#fff,#182132)}
+.canvas-preview #dialogContent output{background:var(--tone-field);color:var(--tone-ink)!important;border-color:var(--tone-line);border-radius:10px}
+.canvas-preview #dialogContent select,.canvas-preview #castTools{background:var(--tone-field);color:var(--tone-ink);border-color:var(--tone-line);border-radius:12px}
+.canvas-preview #dialogContent .viewport,.canvas-preview #referencePair:not([hidden]){background:light-dark(#dfe4ea,#121519);border-radius:16px}
+.canvas-preview #dialogContent .drag-tip,.canvas-preview #dialogContent #previewInfo,.canvas-preview #dialogContent #exportInfo,.canvas-preview #referencePair>div>small{color:var(--tone-muted)!important}
+
+/* Photo workbench: generous preview, grouped controls and a stable action rail. */
+.canvas-preview #dialogContent{padding:16px 20px 0!important;gap:16px}
+.canvas-preview #dialogContent .preview-layout{order:0;grid-template-columns:minmax(0,1fr) 320px!important;gap:20px}
+.canvas-preview #dialogContent .bar{order:1;align-items:center;border-top:1px solid var(--tone-line);padding:14px 0 16px;min-height:44px}
+.canvas-preview #dialogContent .bar button{min-height:44px;padding:10px 24px;font-size:14px;font-weight:650;transition:transform .15s,box-shadow .15s}
+.canvas-preview #dialogContent .bar button:hover{transform:translateY(-1px);box-shadow:0 4px 12px light-dark(#29344520,#0005)}
+.canvas-preview #dialogContent .bar #save{margin-right:auto}
+.canvas-preview #dialogContent .preview-image{background:light-dark(#e1e5ea,#171a1f);border:1px solid var(--tone-line);border-radius:20px;padding:16px;box-sizing:border-box}
+.canvas-preview #dialogContent .viewport,.canvas-preview #referencePair:not([hidden]){background:transparent}
+.canvas-preview #referencePair:not([hidden]){grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;padding:0}
+.canvas-preview #referencePair>div{border-radius:14px;background:light-dark(#edf0f480,#ffffff04);padding:12px 0;box-sizing:border-box}
+.canvas-preview #referencePair>div>small{font-size:13px;font-weight:650;letter-spacing:.2px;color:var(--tone-ink)!important}
+.canvas-preview #dialogContent .frame,.canvas-preview #referenceCompare{box-shadow:0 8px 26px #0002}
+.canvas-preview #dialogContent .drag-tip{font-size:12px;line-height:24px;margin-top:12px}
+.canvas-preview #dialogContent .image-label{background:#232a36ba;border-radius:8px;padding:5px 10px;font-weight:600}
+.canvas-preview #dialogContent .drag-handle{background:#303a49e6;width:36px;height:36px;font-size:20px}
+.canvas-preview #dialogContent .preview-parameters{padding:20px!important;background:light-dark(#f8f9fb,#25292e);box-shadow:0 3px 12px #00000005}
+.canvas-preview #dialogContent .preview-parameters::before{font-size:18px;font-weight:750;margin-bottom:20px}
+.canvas-preview #dialogContent .preview-parameters>label{font-size:13px;font-weight:600;margin-bottom:18px!important}
+.canvas-preview #castTools{padding:12px;margin:0 0 20px;background:var(--tone-field);border-radius:16px}
+.canvas-preview #castTools::before{font-size:13px;font-weight:700;color:var(--tone-ink);margin-bottom:10px}
+.canvas-preview #castTools button{min-height:36px;border-radius:20px;background:var(--tone-panel);border-color:var(--tone-line);color:var(--tone-ink);font-weight:650;box-shadow:0 2px 5px #0000000d}
+.canvas-preview #castTools button:hover{background:light-dark(#fff,#343b45);border-color:var(--tone-muted)}
+.canvas-preview #castTools p{color:var(--tone-muted);font-size:11px;line-height:1.6;margin:4px 0 10px}
+.canvas-preview #dialogContent #globalAdjustTitle{font-size:15px;font-weight:750;padding-top:18px;margin-bottom:16px!important;border-color:var(--tone-line)}
+.canvas-preview #dialogContent .parameter-control{margin-bottom:14px!important}
+.canvas-preview #dialogContent .parameter-control span{font-size:13px;font-weight:600;margin-bottom:5px}
+.canvas-preview #dialogContent input[type=range]{height:20px}
+.canvas-preview #dialogContent input[type=range]::-webkit-slider-runnable-track{background:var(--tone-line);height:5px}
+.canvas-preview #dialogContent input[type=range]::-webkit-slider-thumb{background:light-dark(#526886,#b8c9e3);border-color:var(--tone-panel);width:16px;height:16px;margin-top:-5.5px;box-shadow:0 0 0 1px var(--tone-muted)}
+.canvas-preview #dialogContent #qualityReport{background:var(--tone-field);color:var(--tone-muted);border-radius:12px;margin:14px 0;padding:12px;font-size:11px}
+.canvas-preview #dialogContent #previewInfo{border-top:1px solid var(--tone-line);padding-top:12px;font-size:11px}
+.canvas-preview #dialogContent #exportInfo{font-size:11px}
+@media(max-width:800px){
+ .canvas-preview #dialogContent{padding:10px 10px 0!important;gap:10px}
+ .canvas-preview #dialogContent .preview-layout{grid-template-columns:minmax(0,1fr)!important;gap:10px}
+ .canvas-preview #dialogContent .preview-image{padding:8px}
+ .canvas-preview #referencePair:not([hidden]){gap:8px}
+ .canvas-preview #dialogContent .bar{padding:10px 0}
+ .canvas-preview #dialogContent .bar button{padding:8px 14px;font-size:12px}
+}

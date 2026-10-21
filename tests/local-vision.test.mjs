@@ -2,15 +2,14 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {canvasSkill} from '../server/canvas-skill.mjs'
 import {layeredPrompt} from '../server/local-vision.mjs'
-test('本地四项技能选择专用处理器，扩图保持原路线',async()=>{
- for(const [operation,processor,model] of [['background','local-cutout','birefnet-general'],['erase','local-vision','big-lama'],['upscale','local-vision','RealESRGAN_x2plus'],['separate','qwen-layered','qwen-image-layered-fp8']]){
+test('本地技能与新室内分层选择独立处理器，扩图保持原路线',async()=>{
+ for(const [operation,processor,model] of [['background','local-cutout','birefnet-general'],['erase','local-vision','big-lama'],['upscale','local-vision','RealESRGAN_x2plus'],['separate','interior-separate','doubao-seedream-5-0-pro-260628']]){
   const skill=await canvasSkill(operation);assert.equal(skill.processor,processor);assert.equal(skill.model,model)
  }
  assert.equal((await canvasSkill('expand')).processor,'expand')
 })
-test('Qwen 工作流用原图 latent 条件并保存独立 RGBA 批次',async()=>{
- const skill=await canvasSkill('separate')
- const graph=layeredPrompt('source.png',{...skill.settings,prompt:'room'},'sample')
+test('历史 Qwen 工作流用原图 latent 条件并保存独立 RGBA 批次',async()=>{
+ const graph=layeredPrompt('source.png',{layers:4,steps:20,resolution:640,prompt:'room'},'sample')
  assert.equal(graph['1'].inputs.image,'source.png')
  assert.equal(graph['13'].inputs.layers,4)
  assert.deepEqual(graph['9'].inputs.latent,['8',0]);assert.deepEqual(graph['10'].inputs.latent,['8',0])

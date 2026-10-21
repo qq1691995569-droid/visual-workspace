@@ -209,7 +209,7 @@ a=Image.new('RGB',(1024,1024),'black');a.paste(m,(0,0));a.paste(Image.new('RGB',
       const created=await call('/api/skills/canvas/tasks',input);assert.equal(created.code,200,JSON.stringify(created.data));assert.equal(created.data.skillHash.length,64)
       assert.equal((await call('/api/skills/canvas/tasks',input)).data.id,created.data.id)
       for(let i=0;i<(['background','erase','upscale','separate'].includes(operation)?600:50);i++){last=await call('/api/skills/images/tasks/'+created.data.id);if(['complete','paused'].includes(last.data.status))break;await new Promise(resolve=>setTimeout(resolve,100))}
-      if(['background','erase','upscale','separate'].includes(operation)){assert.equal(last.data.status,'paused',JSON.stringify(last.data));assert.match(last.data.message,/运行环境未安装/);assert.equal(submitted,before);continue}
+      if(['background','erase','upscale','separate'].includes(operation)){assert.equal(last.data.status,'paused',JSON.stringify(last.data));assert.match(last.data.message,operation==='separate'?/对象清单无效/:/运行环境未安装/);assert.equal(submitted,before);continue}
       assert.equal(last.data.status,'complete',JSON.stringify(last.data));assert.equal(submitted,before+1);assert.equal(requests.at(-1).params.count,1)
       assert.equal(last.data.images.length,operation==='separate'?2:1)
       if(operation==='erase')assert.equal(requests.at(-1).params.image_paths.length,2)

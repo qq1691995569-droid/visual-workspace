@@ -12,10 +12,9 @@ test('分组内空白处框选子图片，标题仍可移动整组',async({page}
  await expect(group).not.toHaveClass(/selected/)
  const before=await group.boundingBox()
  const childBefore=await page.locator('[data-id="a"]').boundingBox()
- await page.mouse.move(820,180);await page.mouse.down();await page.mouse.move(870,210,{steps:10});await page.mouse.up()
+ const heading=(await group.locator('.group-heading').boundingBox())!;await page.mouse.move(heading.x+35,heading.y+10);await page.mouse.down();await page.mouse.move(heading.x+85,heading.y+40,{steps:10});await page.mouse.up()
  await expect.poll(async()=>Math.round((await group.boundingBox())!.x-before!.x)).toBeGreaterThan(40)
- const moved=(await group.boundingBox())!.x-before!.x
- expect((await page.locator('[data-id="a"]').boundingBox())!.x-childBefore!.x).toBeCloseTo(moved,0)
+ await expect.poll(async()=>Math.abs(((await page.locator('[data-id="a"]').boundingBox())!.x-childBefore!.x)-((await group.boundingBox())!.x-before!.x))).toBeLessThan(.5)
  await group.getByRole('button',{name:'收拢卡片组',exact:true}).click()
  await expect(group.locator('.collection-folded')).toBeVisible()
  await group.getByRole('button',{name:'展开卡片组',exact:true}).click()

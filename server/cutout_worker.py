@@ -15,6 +15,7 @@ def process(body):
     # Installation is explicit; inference must never silently download a model.
     if not (Path(os.environ['U2NET_HOME'])/(model+'.onnx')).is_file():raise ValueError('Model is not installed')
     if model not in sessions:sessions[model]=new_session(model,providers=['CPUExecutionProvider'])
+    if body.get('base') is None:return {'ready':True}
     image=ImageOps.exif_transpose(Image.open(io.BytesIO(base64.b64decode(body['base'].split(',',1)[1])))).convert('RGBA')
     if image.width*image.height>40_000_000:raise ValueError('Image too large')
     start=time.perf_counter()

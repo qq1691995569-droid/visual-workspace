@@ -1,3 +1,8 @@
+import {writeImageClipboard,writeMultipleImagesClipboard,readClipboardGraph} from './imageClipboard'
+import {groupConnection} from './groupConnections'
+import {GroupActions} from './GroupActions'
+import { pushNeighbours } from './nodeAvoidance'
+import { ThemeToggle } from './ThemeToggle'
 import { previewBatch } from './previewBatch'
 import { pendingTask } from './pendingTask'
 import {ProjectManager} from './ProjectManager'
@@ -11,7 +16,7 @@ import {arrangeCanvas,arrangeWorkflow,avoidExpandedOverlap,toolPlacement,type Ar
 import {copyCanvasImages,pasteCanvasImages} from './canvasClipboard'
 import {ExtractionMonitor} from './ExtractionMonitor'
 import {applyExtractionState,type ExtractionTask,type ExtractedAsset,type ExtractionSnapshot} from './canvasExtraction'
-import {ConnectionHandle as Handle} from './ConnectionHandle'
+import {ConnectionHandle as Handle,ConnectionGeometry} from './ConnectionHandle'
 import { resultEditing } from './resultEditing'
 import { AssetLibrary, type AssetSession, type VisualAsset, type LocalEditRecipe } from './AssetLibrary'
 import { ImageComparison } from './ImageComparison'
@@ -24,11 +29,12 @@ import { ResultDock } from './ResultDock'
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, memo, createContext, useContext } from 'react'
 import { ReactFlow, ReactFlowProvider, Controls, MiniMap, Position, SelectionMode, NodeResizer, useNodesState, useEdgesState, useReactFlow, useStore, useUpdateNodeInternals, addEdge, reconnectEdge, type Node, type NodeProps, type Edge, type Viewport } from '@xyflow/react'
 import { readCanvasProject, writeCanvasProject, canvasProjects, readCanvasBackup } from './canvasStorage'
-import { Undo2, Redo2, Settings2, Archive, Upload, Download, Layers, WandSparkles, Plus, X, ImagePlus, Palette, Sun, Armchair, Maximize, Scan, FolderOpen, Copy, Trash2, Check, ChevronDown, ChevronUp, Group, Ungroup, GripHorizontal, MousePointer2, Map, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Undo2, Redo2, Settings2, Archive, Upload, Download, Layers, WandSparkles, Plus, X, ImagePlus, Palette, Sun, Armchair, Maximize, Scan, FolderOpen, Columns2, Check, ChevronDown, ChevronUp, Group, Ungroup, GripHorizontal, MousePointer2, Map, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
 import '@xyflow/react/dist/style.css'
 import './App.css'
 import './WorkspaceTheme.css'
 import './ComposerDesign.css'
+import './VisualSystem.css'
 import { CanvasEdge } from './CanvasEdge'
 import { ImageJob, type ImageJobState } from './ImageJob'
 import { SkillAdmin } from './SkillAdmin'
@@ -44,7 +50,7 @@ import { defaultGeneration, normalizeGeneration, modelOptions, targetDimensions,
 
 const tools = [
   { id: 'edit', name: '图片编辑', detail: '填写针对当前图片的修改要求', icon: WandSparkles },
-  { id: 'separate', name: '多图层', detail: '配置主体与背景的分层任务', icon: Layers },
+  { id: 'separate', name: '多图层', detail: '按独立对象拆分室内场景，保留背景与透明图层', icon: Layers },
   { id: 'background', name: '去背景', detail: '分离图片主体与背景', icon: Scan },
   { id: 'erase', name: '消除', detail: '描述需要移除的局部元素', icon: Scan },
   { id: 'expand', name: '扩图', detail: '拓展原始图片的画面边界', icon: Maximize },
@@ -147,32 +153,33 @@ function CardNode({ id, data, selected, positionAbsoluteX, positionAbsoluteY, wi
     const tasks = children.map(n => n.data.skillState?.jobId ? n.data.skillState : n.data.imageJob).filter(Boolean)
     const running = tasks.some(t => !['complete','paused','submit_error','submission_unknown'].includes(t!.status || ''))
     const failed = tasks.some(t => ['paused','submit_error','submission_unknown'].includes(t!.status || ''))
-    return <div className={`workflow-group ${selected ? 'selected' : ''} ${data.collapsed ? 'collection-folded' : ''}`}>
+    return <div style={{'--group-edge-scale':1/Math.max(nodeViewport.zoom,.05)} as React.CSSProperties} className={`workflow-group ${selected ? 'selected' : ''} ${data.collapsed ? 'collection-folded' : ''}`}>
       <Handle type="target" position={Position.Left} /><Handle type="source" position={Position.Right} />
       {!data.collapsed && <NodeResizer isVisible={singleSelected} minWidth={280} minHeight={180} />}
-      <div className="group-heading"><GripHorizontal size={17} /><input aria-label="工作流分组名称" className="nodrag nopan" value={data.label} maxLength={60} onChange={e => update(id, { label: e.target.value })} /><button className="nodrag nopan" title="收拢 / 展开 · Ctrl+G" aria-label={data.collapsed ? '展开卡片组' : '收拢卡片组'} onClick={e => { e.stopPropagation(); toggle(id) }}>{data.collapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}</button></div>
-      {data.collapsed ? <><div className="collection-cover">{cover ? <img src={cover.data.previewSrc || cover.data.src} alt="分组封面" draggable={false} style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <Layers size={42} />}</div><div className="collection-footer"><span>{children.length} 个节点</span><button className="nodrag nopan" onClick={() => toggle(id)}>展开</button></div><div className={`collection-status ${failed ? 'failed' : running ? 'running' : ''}`}><i />{failed ? '需要检查' : running ? '处理中' : tasks.length ? '已完成' : '已收纳'}</div></> : <><div className="group-caption">{children.length} 个节点 · 拖动标题整体移动</div><button className="group-ungroup nodrag nopan" onClick={() => ungroup(id)}><Ungroup size={13} />取消收纳</button></>}
+      <div className="group-heading">{data.collapsed ? <span className="collection-icon"><Layers size={18}/></span> : <GripHorizontal size={17} />}<input aria-label="工作流分组名称" className="nodrag nopan" value={data.label} maxLength={60} onChange={e => update(id, { label: e.target.value })} /><button className="nodrag nopan" title="收拢 / 展开 · Ctrl+G" aria-label={data.collapsed ? '展开卡片组' : '收拢卡片组'} onClick={e => { e.stopPropagation(); toggle(id) }}>{data.collapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}</button></div>
+      {data.collapsed ? <><div className="collection-cover">{cover ? <img src={cover.data.previewSrc || cover.data.src} alt="分组封面" draggable={false} style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', objectFit: 'cover', objectPosition: 'center' }} /> : <Layers size={42} />}</div><div className="collection-footer"><div className="collection-summary"><span className="collection-count"><b>{children.length}</b> 个节点</span><span className={`collection-status ${failed ? 'failed' : running ? 'running' : ''}`}><i />{failed ? '需要检查' : running ? '处理中' : tasks.length ? '已完成' : '已收纳'}</span></div><button className="nodrag nopan" onClick={e => { e.stopPropagation(); toggle(id) }}>展开<ChevronRight size={14}/></button></div></> : <><div className="group-caption">{children.length} 个节点 · 拖动标题整体移动</div><button className="group-ungroup nodrag nopan" onClick={() => ungroup(id)}><Ungroup size={13} />取消收纳</button></>}
     </div>
   }
   if(data.extraction&&!data.src)return <>{imageTag}<GenerationPlaceholder task={{...data.extraction,status:data.extraction.itemStatus||data.extraction.status,message:data.extraction.itemMessage||data.extraction.message}} index={data.extraction.index}><Handle type="target" position={Position.Left}/></GenerationPlaceholder></>
   if (data.kind === 'image' && data.pendingResult) {
     return <>{imageTag}<GenerationPlaceholder task={pendingJob || { status: 'restoring', message: '正在查询原任务状态，请稍候' }} index={data.pendingResult.index}><Handle type="target" position={Position.Left} />{data.imageJob && <Handle type="source" position={Position.Right} />}</GenerationPlaceholder></>
   }
-  if (data.kind === 'image') return <div ref={cardRef} style={{'--image-hover-scale':1/Math.max(nodeViewport.zoom,.05)} as React.CSSProperties} className={['card image clean-image', data.skillResult && !data.pendingResult && (!data.imageJob || data.imageOutput) ? 'generation-result' : '', selected ? 'active' : '', data.collapsed ? 'folded-image' : ''].join(' ')}>
+  if (data.kind === 'image') return <div ref={cardRef} style={{'--image-hover-scale':1/Math.max(nodeViewport.zoom,.05),'--image-meta-scale':Math.min(1/Math.max(nodeViewport.zoom,.05),width/210)} as React.CSSProperties} className={['card image clean-image', data.skillResult && !data.pendingResult && (!data.imageJob || data.imageOutput) ? 'generation-result' : '', selected ? 'active' : '', data.collapsed ? 'folded-image' : ''].join(' ')}>
     {imageTag}
+    {selected && !editing && <span className="image-selection-badge" aria-label="图片已选中"><Check size={12} strokeWidth={2}/></span>}
     {selected && !resizingImage && !data.task && (!data.imageJob || data.imageOutput) && !editing && singleSelected && <ImageToolbar onSaveAsset={data.extractedAsset?()=>quick('save-asset',id):undefined} assetSaved={data.extractedAsset?.archived} anchor={cardRef} revision={[positionAbsoluteX, positionAbsoluteY, nodeViewport.x, nodeViewport.y, nodeViewport.zoom, data.collapsed].join(':')} onCompare={(isSkillImage || !!data.toneSettings) && (data.comparison?.original || data.comparison?.input || data.skillResult?.baseId || data.version?.parentId) ? ()=>quick('compare',id) : undefined} onAction={operation => quick(operation, id)} onDownload={() => data.src && download(data.src, data.label)} />}
     {singleSelected && data.src && !data.task && (!data.imageJob || data.imageOutput) && !editing && <ImageDimensions src={data.src} previewSrc={data.previewSrc} dimensions={data.dimensions}/>}
     <NodeResizer isVisible={singleSelected && !data.collapsed && !editing && !data.task && (!data.imageJob || data.imageOutput)} minWidth={40} minHeight={40} keepAspectRatio onResizeStart={() => setResizingImage(true)} onResizeEnd={(_, size) => { setResizingImage(false); update(id, { expandedSize: { width: size.width, height: size.height } }) }} />
     <Handle type="target" position={Position.Left} isConnectable={false} aria-hidden="true" />
     <div className={data.task || data.imageJob && !data.imageOutput ? 'image-body task-input-preview' : 'image-body'}><CanvasImage src={data.previewSrc || data.src || ''} alt={data.task ? '输入图片预览，尚未生成结果' : data.label} width={width} height={height} /></div>
     {data.task && <div className="quick-task-state" role="status"><strong>{builtinSkills[data.task.operation].name}</strong><span>旧版任务，请重新发起</span><small>尚未生成 · 底图仅为输入预览</small></div>}
-    {data.imageJob && !data.imageOutput && <div className="generation-overlay"><GenerationPlaceholder task={data.imageJob} preview={data.previewSrc || data.src} frame={data.canvasParameters?.frame} operation={data.canvasOperation==='background'?'分离主体':data.canvasOperation==='expand'?'扩图':data.canvasOperation==='upscale'?'提升清晰度':data.canvasOperation==='separate'?'拆分图层':undefined}/>{['paused','needs_attention','connection_lost','submission_unknown'].includes(data.imageJob.status)&&<button className="nodrag nopan" onClick={()=>update(id,{imageJob:{...data.imageJob!,status:'restoring',queryAttempt:(data.imageJob!.queryAttempt||0)+1,message:'正在重新查询原任务…'}})}>重新查询原任务</button>}</div>}
+    {data.imageJob && !data.imageOutput && <div className="generation-overlay"><GenerationPlaceholder task={data.imageJob} preview={data.previewSrc || data.src} frame={data.canvasParameters?.frame} operation={data.canvasOperation==='background'?'分离主体':data.canvasOperation==='expand'?'扩图':data.canvasOperation==='upscale'?'提升清晰度':data.canvasOperation==='separate'?'拆分图层':undefined} action={['paused','needs_attention','connection_lost','submission_unknown'].includes(data.imageJob.status)&&<button className="nodrag nopan" onClick={()=>update(id,{imageJob:{...data.imageJob!,status:'restoring',queryAttempt:(data.imageJob!.queryAttempt||0)+1,message:'正在重新查询原任务…'}})}>查询状态</button>}/></div>}
     {editing?.id === id && <InlineImageEdit key={editing.operation} anchor={cardRef} sourceLabel={data.label} sourceImage={data.previewSrc || data.src} operation={editing.operation} revision={[positionAbsoluteX, positionAbsoluteY, nodeViewport.x, nodeViewport.y, nodeViewport.zoom].join(':')} onCancel={cancelEdit} onConfirm={confirmEdit} />}
     <Handle type="source" position={Position.Right} />
   </div>
   if(data.canvasImageNode)return <div className={`image-generator-node ${selected?'active':''}`}>
     <Handle type="target" position={Position.Left}/><span className="generator-ports" aria-hidden="true">·<br/>·<br/>·</span>
-    <ImagePlus size={25}/><small>图像</small>
+    <div className="generator-identity"><span className="generator-icon"><ImagePlus size={32}/></span><strong>图像</strong><small>连接参考图，开始创作</small></div>
     {data.imageJob&&data.imageJob.status!=='complete'&&<div className="generation-overlay"><GenerationPlaceholder task={data.imageJob}/></div>}
     <NodeResizer isVisible={singleSelected} minWidth={160} minHeight={100}/>
     <Handle type="source" position={Position.Right}/>
@@ -276,6 +283,8 @@ function Workspace() {
   },[nodes,editing,previewId,pairComparison,assetSession,skillAdminOpen])
   const legacyGeneratorIds = new Set(nodes.filter(n => n.data.kind === 'tool' && !n.data.canvasImageNode && ['generate','redraw'].includes(n.data.tool || '')).map(n => n.id))
   const selected = nodes.find(n => n.selected && !legacyGeneratorIds.has(n.id))
+  const selectedGroups = [...new Set(nodes.filter(n=>n.selected).map(n=>n.data.kind==='group'?n.id:n.parentId).filter((id): id is string=>!!id))]
+
   const activeTool = nodes.filter(n => n.selected).length === 1 && selected?.data.kind === 'tool' ? selected : undefined
   const orphanedJobs = [...new globalThis.Map<string, NonNullable<Card['data']['pendingResult']>>(nodes.filter(n => n.data.pendingResult).map(n => [n.data.pendingResult!.jobId, n.data.pendingResult!] as const)).values()].filter(p => !nodes.some(n => n.id === p.sourceNode && [n.data.skillState?.jobId, n.data.skillState?.requestId, n.data.imageJob?.id, n.data.imageJob?.requestId].includes(p.jobId)))
   const resultImage = nodes.filter(n => n.selected).length === 1 && selected?.data.kind === 'image' && selected.data.skillResult ? selected : undefined
@@ -346,10 +355,12 @@ function Workspace() {
   const focused=useMemo(()=>{
     const adjacency=new globalThis.Map<string,string[]>()
     for(const e of edges){adjacency.set(e.source,[...(adjacency.get(e.source)||[]),e.target]);adjacency.set(e.target,[...(adjacency.get(e.target)||[]),e.source])}
-    const seen=new Set(selectedIds),queue=[...seen]
+    const seen=new Set(selectedIds)
+    for(const n of nodes)if(n.parentId&&selectedIds.has(n.parentId))seen.add(n.id)
+    const queue=[...seen]
     for(let i=0;i<queue.length;i++)for(const id of adjacency.get(queue[i])||[])if(!seen.has(id)){seen.add(id);queue.push(id)}
     return seen
-  },[edges,selectedIds])
+  },[edges,selectedIds,nodes])
   const nodeLookup = new globalThis.Map(nodes.map(n=>[n.id,n]))
   const foldedParent = (id: string) => { const n = nodeLookup.get(id); return n?.parentId && nodeLookup.get(n.parentId)?.data.collapsed ? n.parentId : undefined }
   // Hidden nodes stay in the graph store but unmount their canvas UI. Task monitors live above ReactFlow.
@@ -361,7 +372,10 @@ function Workspace() {
     return status ? !['complete','completed','paused','failed','error','cancelled','canceled','submit_error'].includes(status) : !!data.pendingResult
   }
   let animatedConnections = 0
-  const visibleEdges: Edge[] = edges.map(edge => { const source = foldedParent(edge.source) || edge.source, target = foldedParent(edge.target) || edge.target; const groupSelected = selectedIds.has(source)||selectedIds.has(target); return { ...edge, source, target, sourceHandle: source !== edge.source ? undefined : edge.sourceHandle, targetHandle: target !== edge.target ? undefined : edge.targetHandle, hidden: legacyGeneratorIds.has(source) || legacyGeneratorIds.has(target) || source === target || !edge.selected && !groupSelected && !(focused.has(edge.source) && focused.has(edge.target)), type: 'editable', data: {...edge.data, transmitting: source === edge.source && target === edge.target && (taskRunning(nodeLookup.get(edge.target)?.data) || taskRunning(nodeLookup.get(edge.source)?.data)) && (edge.selected || groupSelected || focused.has(edge.source) && focused.has(edge.target)) && animatedConnections++ < 48}, reconnectable: edge.reconnectable!==false && source === edge.source && target === edge.target } })
+  const visibleEdges: Edge[] = edges.map(edge => {
+    const projected=groupConnection(edge,nodeLookup,focused,selectedIds,legacyGeneratorIds)
+    return {...projected,type:'editable',data:{...edge.data,transmitting:projected.source===edge.source&&projected.target===edge.target&&(taskRunning(nodeLookup.get(edge.target)?.data)||taskRunning(nodeLookup.get(edge.source)?.data))&&!projected.hidden&&animatedConnections++<48}}
+  })
   useEffect(() => { let active = true; readCanvasProject().then(raw => { if (!active) return; if (raw) { const p = validate(raw); setNodes(p.nodes.map(n => n.data.skillResult ? { ...n, data: { ...n.data, provenanceLinked: true } } : n)); setEdges([...p.edges, ...p.nodes.filter(n => !n.data.provenanceLinked && n.data.skillResult && n.data.skillResult.sourceNode !== n.id && p.nodes.some(source => source.id === n.data.skillResult!.sourceNode) && !p.edges.some(e => e.id === `result-${n.id}` || e.source === n.data.skillResult!.sourceNode && e.target === n.id)).map(n => ({ id: `result-${n.id}`, source: n.data.skillResult!.sourceNode, target: n.id }))]); setName(p.name); setComposerReferenceIds(Array.isArray(p.draft?.referenceIds) ? [...new Set(p.draft.referenceIds.filter(id=>typeof id==='string'))].slice(0,9) : []); setDraftPrompt(p.draft?.prompt || ''); setDraftGeneration(normalizeGeneration(p.draft?.generation)); setDraftMode(p.draft?.mode === 'redraw' ? 'redraw' : 'generate'); setViewportState(p.viewport); void hydrationFlow.current.setViewport(p.viewport) } persistenceAllowed.current=true }).catch((error:unknown) => { if (active) {const reason=error instanceof Error?error.message:'未知读取错误';setLoadError(reason);setToast('本地项目读取失败：'+reason+'；已暂停自动保存，原记录未覆盖');setSaveStatus('读取失败：'+reason+'，自动保存已暂停')} }).finally(() => { if (active) setReady(true) }); return () => { active = false } }, [setNodes, setEdges])
   useEffect(() => {
     if(!ready||projectsOpen||!persistenceAllowed.current||nodes.some(n=>n.dragging||n.resizing))return
@@ -574,13 +588,24 @@ function Workspace() {
   }
   const clipboardHandlers=useRef<{copy:(e:ClipboardEvent)=>void;paste:(e:ClipboardEvent)=>void}>({copy:()=>{},paste:()=>{}})
   const pasteCount=useRef(0)
+  function copyImageToSystem(src:string,text:string) {
+    setToast('正在复制原图…')
+    void writeImageClipboard(src,text).then(()=>{pasteCount.current=0;setToast('图片已复制，可切到 Figma 按 Ctrl+V 粘贴')}).catch(()=>setToast('图片复制失败，请保持页面聚焦，并允许剪贴板访问后重试'))
+  }
   useEffect(()=>{
     const blocked=(event:ClipboardEvent)=>editing||previewId||skillAdminOpen||assetSession&&assetSession.mode!=='browse'||(event.target as HTMLElement|null)?.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="dialog"],.asset-workspace')
     clipboardHandlers.current={copy:event=>{
       if(blocked(event)||window.getSelection()?.toString())return
       const graph=copyCanvasImages(nodes,edges)
       if(!graph.nodes.length||!event.clipboardData)return
-      try{const text=JSON.stringify({format:'visual-canvas-clipboard',version:1,...graph});event.clipboardData.setData('application/x-visual-canvas',text);event.clipboardData.setData('text/plain',text);event.preventDefault();pasteCount.current=0;setToast(`已复制 ${graph.nodes.length} 张图片，Ctrl+V 粘贴`)}catch{setToast('图片复制失败，请重试')}
+      if(graph.nodes.length===1){event.preventDefault();copyImageToSystem(String(graph.nodes[0].data.src),JSON.stringify({format:'visual-canvas-clipboard',version:1,...graph}));return}
+      try{
+        const text=JSON.stringify({format:'visual-canvas-clipboard',version:1,...graph})
+        event.preventDefault();setToast(`正在复制 ${graph.nodes.length} 张图片…`)
+        void writeMultipleImagesClipboard(graph.nodes.map(n=>({src:String(n.data.src),label:String(n.data.label||'图片'),x:n.position.x,y:n.position.y,width:Number(n.style?.width)||n.measured?.width||300,height:Number(n.style?.height)||n.measured?.height||300})),text)
+          .then(()=>{pasteCount.current=0;setToast(`已复制 ${graph.nodes.length} 张图片，可粘贴到画板或 Figma`)})
+          .catch(()=>setToast('多图复制失败，请减少图片数量并允许剪贴板访问后重试'))
+      }catch{setToast('图片复制失败，请重试')}
     },paste:event=>{
       if(blocked(event)||!event.clipboardData)return
       const data=event.clipboardData,custom=data.getData('application/x-visual-canvas'),text=custom||data.getData('text/plain')
@@ -591,7 +616,26 @@ function Workspace() {
         return
       }
       const files=Array.from(data.items).filter(item=>item.kind==='file'&&item.type.startsWith('image/')).map(item=>item.getAsFile()).filter((file):file is File=>!!file)
-      if(files.length){event.preventDefault();void importImages(files,center)}
+      if(files.length){
+        event.preventDefault()
+        void readClipboardGraph().then(text=>{
+          if(text){
+            try{
+              if(text.length>150*1024*1024)throw Error('复制内容过大')
+              const raw=JSON.parse(text)
+              if(raw.format!=='visual-canvas-clipboard'||raw.version!==1)throw Error('格式不支持')
+              const project=validate({format:'visproj',schemaVersion:1,name:'Clipboard',nodes:raw.nodes,edges:raw.edges,viewport:{x:0,y:0,zoom:1}})
+              const clean=copyCanvasImages(project.nodes,project.edges)
+              if(!clean.nodes.length)throw Error('没有图片')
+              const offset=(pasteCount.current++%8)*28
+              const graph=pasteCanvasImages(clean,{x:center.x-170+offset,y:center.y-120+offset},uid)
+              setNodes(current=>[...current.map(n=>({...n,selected:false})),...graph.nodes])
+              setEdges(current=>[...current,...graph.edges]);setToast(`已粘贴 ${graph.nodes.length} 张图片`);return
+            }catch{ /* Fall back to the PNG if custom data cannot be restored. */ }
+          }
+          void importImages(files,center)
+        })
+      }
     }}
   })
   useEffect(()=>{const copy=(event:ClipboardEvent)=>clipboardHandlers.current.copy(event),paste=(event:ClipboardEvent)=>clipboardHandlers.current.paste(event);window.addEventListener('copy',copy);window.addEventListener('paste',paste);return()=>{window.removeEventListener('copy',copy);window.removeEventListener('paste',paste)}},[])
@@ -862,10 +906,19 @@ function Workspace() {
         setNodes(current=>unlinkMaterialReferences(current.map(n=>controllers.some(c=>c.id===n.id)?{...n,data:{...n.data,imageJob:undefined,skillState:n.data.skillState?{...n.data.skillState,jobId:undefined,requestId:undefined,status:undefined}:undefined}}:n),sources))
         if(jobs.size)setToast(remoteMayContinue?'任务已删除并停止本地跟踪；远端或已开始的计算可能仍在执行':'任务及后台记录已清理')
         return {nodes:removal,edges:[...new globalThis.Map([...removedEdges,...edges.filter(e=>ids.has(e.source)||ids.has(e.target))].map(e=>[e.id,e])).values()]}
-      }} zoomOnDoubleClick={false} onNodeDoubleClick={(_, node) => { if (node.data.kind === 'image' && !node.data.task && (!node.data.imageJob || node.data.imageOutput) && !editing) setPreviewId(node.id) }} nodesDraggable={!editing} nodes={displayNodes} edges={visibleEdges} onSelectionStart={()=>{marqueeActive.current=true}} onSelectionEnd={()=>{marqueeActive.current=false}} onNodesChange={changes=>onNodesChange(changes.map(change=>change.type==='select' && change.selected && marqueeActive.current && nodes.some(n=>n.id===change.id && n.data.kind==='group' && !n.data.collapsed) ? {...change,selected:false} : change))} onEdgesChange={onEdgesChange} edgeTypes={edgeTypes} edgesReconnectable reconnectRadius={16} onEdgeClick={() => { setNodes(current => current.map(node => ({ ...node, selected: false }))); setMenu(null) }} onReconnectStart={() => { reconnectSucceeded.current = false; reconnectSession.current = true; setNodes(current => current.map(node => ({ ...node, selected: false }))); setMenu(null) }} onReconnect={(edge, connection) => { if (connection.source === connection.target) return; reconnectSucceeded.current = true; setEdges(current => reconnectEdge(edge, connection, current, { shouldReplaceId: false }).map(item => ({ ...item, selected: item.id === edge.id }))) }} onReconnectEnd={(_, edge, _handle, connection) => { if (!reconnectSucceeded.current && !connection.toNode) setEdges(current => current.filter(item => item.id !== edge.id)); requestAnimationFrame(() => { reconnectSession.current = false }) }} nodeTypes={nodeTypes} minZoom={0.15} maxZoom={3} defaultViewport={viewport} defaultEdgeOptions={{ type: 'editable', reconnectable: true, interactionWidth: 28, style: { stroke: '#9aadd0', strokeWidth: 2 } }} onMoveEnd={(_, vp) => setViewportState(vp)} onPaneClick={() => { setMenu(null); clearComposer(); setNodes(current => current.map(node => node.selected ? { ...node, selected: false } : node)) }} onConnect={c => { if(c.source===c.target)return;const target=nodes.find(n=>n.id===c.target);if(target?.data.canvasImageNode){if(!nodes.some(n=>n.id===c.source&&n.data.src)||edges.filter(e=>e.target===c.target).length>=9){setToast('请连接有效图片，最多 9 张参考');return}setNodes(current=>current.map(n=>({...n,selected:n.id===c.target})));setEditorMode('free');setComposerOpen(true)}setEdges(es=>addEdge(c,es)) }} onConnectEnd={(e, state) => { if (reconnectSession.current) return; if (!state.isValid && state.fromNode && state.fromHandle?.type === 'source') { const point = 'changedTouches' in e ? e.changedTouches[0] : e; setMenu({ x: point.clientX, y: point.clientY, source: state.fromNode.id }) } }} onNodeContextMenu={(e, n) => { e.preventDefault(); if (n.data.kind === 'group' || n.data.task || n.data.imageJob && !n.data.imageOutput) return; setNodes(ns => ns.map(x => ({ ...x, selected: x.id === n.id }))); setMenu({ x: e.clientX, y: e.clientY, source: n.id }) }} selectionMode={SelectionMode.Partial} selectionKeyCode={null} selectNodesOnDrag selectionOnDrag={!editing} multiSelectionKeyCode="Shift" panOnDrag={[1]} deleteKeyCode={editing ? null : ['Backspace', 'Delete']}><CanvasBackground /><Controls showInteractive={false} fitViewOptions={{ padding: { left: panelOpen && window.innerWidth > 800 ? '350px' : '100px', right: '55px', top: '80px', bottom: '145px' }, maxZoom: 1 }} />{showMinimap && <MiniMap pannable zoomable nodeColor={n => n.data.kind === 'tool' ? '#b29ae9' : n.data.kind === 'group' ? '#e3dff0' : '#adbcb4'} />}</ReactFlow>}
+      }} zoomOnDoubleClick={false} onNodeDoubleClick={(_, node) => { if (node.data.kind === 'image' && !node.data.task && (!node.data.imageJob || node.data.imageOutput) && !editing) setPreviewId(node.id) }} onNodeDrag={(_, node) => { if (!editing) setNodes(current => pushNeighbours(current, node)) }} nodesDraggable={!editing} nodes={displayNodes} edges={visibleEdges} onSelectionStart={()=>{marqueeActive.current=true}} onSelectionEnd={()=>{marqueeActive.current=false}} onNodesChange={changes=>onNodesChange(changes.map(change=>change.type==='select' && change.selected && marqueeActive.current && nodes.some(n=>n.id===change.id && n.data.kind==='group' && !n.data.collapsed) ? {...change,selected:false} : change))} onEdgesChange={onEdgesChange} edgeTypes={edgeTypes} edgesReconnectable reconnectRadius={16} onEdgeClick={() => { setNodes(current => current.map(node => ({ ...node, selected: false }))); setMenu(null) }} onReconnectStart={() => { reconnectSucceeded.current = false; reconnectSession.current = true; setNodes(current => current.map(node => ({ ...node, selected: false }))); setMenu(null) }} onReconnect={(edge, connection) => { if (connection.source === connection.target) return; reconnectSucceeded.current = true; setEdges(current => reconnectEdge(edge, connection, current, { shouldReplaceId: false }).map(item => ({ ...item, selected: item.id === edge.id }))) }} onReconnectEnd={(_, edge, _handle, connection) => { if (!reconnectSucceeded.current && !connection.toNode) setEdges(current => current.filter(item => item.id !== edge.id)); requestAnimationFrame(() => { reconnectSession.current = false }) }} nodeTypes={nodeTypes} minZoom={0.15} maxZoom={3} defaultViewport={viewport} defaultEdgeOptions={{ type: 'editable', reconnectable: true, interactionWidth: 28, style: { stroke: '#9aadd0', strokeWidth: 2 } }} onMoveEnd={(_, vp) => setViewportState(vp)} onPaneClick={() => { setMenu(null); clearComposer(); setNodes(current => current.map(node => node.selected ? { ...node, selected: false } : node)) }} onConnect={c => { if(c.source===c.target)return;const target=nodes.find(n=>n.id===c.target);if(target?.data.canvasImageNode){if(!nodes.some(n=>n.id===c.source&&n.data.src)||edges.filter(e=>e.target===c.target).length>=9){setToast('请连接有效图片，最多 9 张参考');return}setNodes(current=>current.map(n=>({...n,selected:n.id===c.target})));setEditorMode('free');setComposerOpen(true)}setEdges(es=>addEdge(c,es)) }} onConnectEnd={(e, state) => { if (reconnectSession.current) return; if (!state.isValid && state.fromNode && state.fromHandle?.type === 'source') { const point = 'changedTouches' in e ? e.changedTouches[0] : e; setMenu({ x: point.clientX, y: point.clientY, source: state.fromNode.id }) } }} onNodeContextMenu={(e, n) => { e.preventDefault(); if (n.data.kind === 'group' || n.data.task || n.data.imageJob && !n.data.imageOutput) return; setNodes(ns => ns.map(x => ({ ...x, selected: x.id === n.id }))); setMenu({ x: e.clientX, y: e.clientY, source: n.id }) }} selectionMode={SelectionMode.Partial} selectionKeyCode={null} selectNodesOnDrag selectionOnDrag={!editing} multiSelectionKeyCode="Shift" panOnDrag={[1]} deleteKeyCode={editing ? null : ['Backspace', 'Delete']}><ConnectionGeometry /><CanvasBackground /><Controls showInteractive={false} fitViewOptions={{ padding: { left: panelOpen && window.innerWidth > 800 ? '350px' : '100px', right: '55px', top: '80px', bottom: '145px' }, maxZoom: 1 }}><ThemeToggle /></Controls>{showMinimap && <MiniMap pannable zoomable nodeColor={n => n.data.kind === 'tool' ? '#b29ae9' : n.data.kind === 'group' ? '#e3dff0' : '#adbcb4'} />}</ReactFlow>}
       {loadError && <div className="empty-state" role="alert"><h1>画布读取未完成</h1><p>{loadError}</p><p>已暂停自动保存，原有项目记录未被覆盖。</p><button className="primary" onClick={()=>window.location.reload()}>重新读取画布</button></div>}
       {nodes.length === 0 && ready && !loadError && <div className="empty-state"><div className="empty-art"><div /><ImagePlus size={35} /><div /></div><div className="eyebrow">YOUR NEXT IDEA STARTS HERE</div><h1>把想象，连接成画面。</h1><p>拖入图片，连接工具，让每一次创作都有迹可循。</p><button className="primary" onClick={() => upload.current?.click()}><Plus size={17} />导入第一张图片</button><small>或从左侧添加文生图节点</small></div>}
-      {selected && !editing && <div className="selection-bar"><span>已选中 {nodes.filter(n => n.selected).length} 项</span>{nodes.filter(n => n.selected).length >= 2 && <>{nodes.filter(n => n.selected && n.data.kind === 'image').length >= 2 && <button title="将选中的图片并排排列 · Alt+Shift+H" onClick={() => arrangeSelection('row')}>并排对齐</button>}<button title="按连接关系整理所选节点，生成图片按批次排列" onClick={() => setNodes(current => arrangeWorkflow(current, edges))}><Layers size={15} />节点整理</button><button onClick={() => groupSelection()}><Group size={15} />收拢</button></>}{selected.data.kind === 'group' ? <><button onClick={() => toggleNode(selected.id)}>{selected.data.collapsed ? '展开卡片组' : '收拢卡片组'}</button><button onClick={() => ungroup(selected.id)}><Ungroup size={15} />取消收纳</button></> : <>{nodes.filter(n => n.selected).length === 1 && <button onClick={() => nodes.filter(n => n.selected && n.data.kind !== 'group').forEach(n => toggleNode(n.id))}>{selected.data.collapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}{selected.data.collapsed ? '展开' : '折叠'}</button>}{selected.data.kind === 'image' && !selected.data.task && (!selected.data.imageJob || selected.data.imageOutput) && <><button onClick={() => update(selected.id, { final: !selected.data.final })}><Check size={15} />{selected.data.final ? '取消定稿' : '标为定稿'}</button><button onClick={() => { if (selected.data.src) download(selected.data.src, selected.data.label) }}><Download size={15} />下载</button></>}<button onClick={() => { if(selected.data.kind==='image'){const graph=copyCanvasImages(nodes,edges);if(!graph.nodes.length)return;const at=absolutePosition(selected.id,nodes);const pasted=pasteCanvasImages(graph,{x:at.x+50,y:at.y+60},uid);setNodes(ns=>[...ns.map(n=>({...n,selected:false})),...pasted.nodes.map(n=>({...n,data:{...n.data,label:n.data.label+' 副本'}}))]);return} const id = uid(); const position = absolutePosition(selected.id, nodes); const { parentId: _parent, extent: _extent, expandParent: _expand, ...copy } = selected; setNodes(ns => [...ns.map(n => ({ ...n, selected: false })), { ...copy, id, selected: true, position: { x: position.x + 50, y: position.y + 60 }, data: { ...selected.data, label: selected.data.label + ' 副本' } }]) }}><Copy size={15} />复制</button><button onClick={() => void flow.deleteElements({ nodes: nodes.filter(n => n.selected && n.data.kind !== 'group').map(n => ({ id: n.id })) })}><Trash2 size={15} />删除</button></>}</div>}
+      {selected && !editing && <div className="selection-bar selection-tools" role="toolbar" aria-label="选中项布局">
+        <span className="selection-count">已选 {nodes.filter(n => n.selected).length} 项</span>
+        <button disabled={nodes.filter(n => n.selected && n.data.kind === 'image').length < 2} title="选中至少两张图片并排展示 · Alt+Shift+H" onClick={() => arrangeSelection('row')}><Columns2 size={18} />并排展示</button>
+        <button disabled={nodes.filter(n => n.selected).length < 2} title="按流程从左到右整理，分支对齐、同层纵向排列" onClick={() => setNodes(current => arrangeWorkflow(current, edges))}><Layers size={18} />节点整理</button>
+        <GroupActions key={nodes.filter(n=>n.selected).map(n=>n.id).join(',')} collapsed={!!selected.data.collapsed} hasGroups={selectedGroups.length>0}
+          onFold={()=>{if(selectedGroups.length){selectedGroups.forEach(id=>{if(!nodes.find(n=>n.id===id)?.data.collapsed)toggleNode(id)})}else if(nodes.filter(n=>n.selected).length>1)groupSelection();else if(!selected.data.collapsed)toggleNode(selected.id)}}
+          onExpand={()=>{if(selectedGroups.length){selectedGroups.forEach(id=>{if(nodes.find(n=>n.id===id)?.data.collapsed)toggleNode(id)})}else if(selected.data.collapsed)toggleNode(selected.id)}}
+          onUngroup={()=>selectedGroups.forEach(id=>ungroup(id))}/>
+
+      </div>}
 
       {draggingFile && <div className="drop-overlay"><div><Upload size={28} /><strong>松开，添加图片到画布</strong><span>PNG、JPG · 单张最大 25MB · 画布预览最长边 4K，下载保留原图</span></div></div>}
       <div className="canvas-hint">左键选择 / 框选 · 按住中键平移 · 滚轮缩放</div>
@@ -884,7 +937,7 @@ function Workspace() {
       const supplement=node.data.skillState?.supplement ?? node.data.localEdit?.supplement ?? recipe.supplement
       return {...node,data:{...node.data,localEdit:{...recipe,supplement},generation:node.data.generation||options,skillState:{...node.data.skillState,baseId:sourceId,options:node.data.skillState?.options||{...options,ratio:'auto'},supplement}}}
     })); else {addTool(recipe.kind==='material'?'material':'furniture',undefined,sourceId,{localEdit:recipe,generation:options,skillState:{baseId:sourceId,options:{...options},supplement:recipe.supplement}});setToast('对象与资产已绑定，请在画布节点设置参数并生成')} }} onAdd={addAssetImage} />}
-    {menu && <div className="tool-menu" style={{ left: Math.max(8, Math.min(menu.x, window.innerWidth - 285)), top: Math.max(8, Math.min(menu.y, window.innerHeight - 470)) }}><div className="menu-title">添加到画布<button aria-label="关闭菜单" onClick={() => setMenu(null)}><X size={15} /></button></div>{sidebarTools.filter(t => t.id !== 'generate').map(t => <button key={t.id} onClick={() => addTool(t.id, flow.screenToFlowPosition({ x: menu.x, y: menu.y }), menu.source)}><t.icon size={17} /><span>{t.name}<small>{t.detail}</small></span><Plus size={13} /></button>)}</div>}
+    {menu && <div className="tool-menu" style={{ left: Math.max(8, Math.min(menu.x, window.innerWidth - 320)), top: Math.max(8, Math.min(menu.y, window.innerHeight - 580)) }}><div className="menu-title">添加到画布<button aria-label="关闭菜单" onClick={() => setMenu(null)}><X size={15} /></button></div>{sidebarTools.filter(t => t.id !== 'generate').map(t => <button key={t.id} onClick={() => addTool(t.id, flow.screenToFlowPosition({ x: menu.x, y: menu.y }), menu.source)}><t.icon size={17} /><span>{t.name}<small>{t.detail}</small></span><Plus size={13} /></button>)}</div>}
     {pairComparison && <div className="image-preview-backdrop" role="dialog" aria-modal="true" aria-label="两张图片滑块对比" onClick={()=>setPairComparison(null)}><div className="image-preview-window" onClick={e=>e.stopPropagation()}><div className="preview-actions"><span>两图对比</span><button onClick={()=>setPairComparison(pair=>pair?[pair[1],pair[0]]:null)}>交换左右</button><button aria-label="关闭两图对比" autoFocus onClick={()=>setPairComparison(null)}><X size={18}/></button></div><ImageComparison key={pairComparison.map(p=>p.label).join(':')} original={pairComparison[0].src} result={pairComparison[1].src} beforeLabel={pairComparison[0].label} afterLabel={pairComparison[1].label}/></div></div>}
     {preview && <div className="image-preview-backdrop" role="dialog" aria-modal="true" aria-label="图片预览" onClick={() => setPreviewId(null)}><div className="image-preview-window" onClick={e => e.stopPropagation()}><div className="preview-actions"><span>图片预览</span>{previewOriginal && <button onClick={() => setCompareOriginal(v => v === preview.id ? null : preview.id)}>{comparisonVisible ? '仅看结果' : '滑块对比'}</button>}<button aria-label="下载预览图片" onClick={() => preview.data.src && download(preview.data.src, preview.data.label)}><Download size={18} /></button><button aria-label="关闭图片预览" autoFocus onClick={() => setPreviewId(null)}><X size={18} /></button></div><>{comparisonVisible && previewOriginal ? <ImageComparison key={preview.id} original={previewOriginal} input={preview.data.comparison?.input} result={preview.data.src!} /> : <img src={preview.data.src} alt={preview.data.label} />}</>{preview.data.skillResult && <details className="preview-review"><summary>结果复核 · 请对照底图检查</summary>{Object.entries(preview.data.skillResult.review).map(([key, value]) => <p key={key}>{({ geometry: '构图', product: '产品', material: '材质', lighting: '光影' } as Record<string,string>)[key] || key}：{String(value)}</p>)}</details>}{previewImages.length > 1 && <div className="preview-pager"><button aria-label="上一张图片" onClick={() => setPreviewId(previewImages[(previewIndex - 1 + previewImages.length) % previewImages.length].id)}><ChevronLeft size={17} /></button><span>{previewIndex + 1} / {previewImages.length}</span><button aria-label="下一张图片" onClick={() => setPreviewId(previewImages[(previewIndex + 1) % previewImages.length].id)}><ChevronRight size={17} /></button></div>}</div></div>}
     {toneTarget && <ToneWorkbench key={toneTarget.id} target={toneTarget} initialReference={toneTarget.reference} initialParameters={toneTarget.parameters} references={nodes.filter(n=>n.id!==toneTarget.id&&n.data.kind==='image'&&n.data.src).map(n=>({id:n.id,src:n.data.src!,label:n.data.label||'图片'}))} onClose={()=>setToneTarget(null)} onApply={(src,width,height,parameters)=>{

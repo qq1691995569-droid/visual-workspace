@@ -1,17 +1,32 @@
 import type { Node } from '@xyflow/react'
 
+/** Fit idle groups to their content while preserving every child's world position. */
 export function fitGroupNodes<N extends Node>(nodes: N[]): N[] {
-  let changed = false
-  const next = nodes.map(group => {
-    if (group.data.kind !== 'group') return group
-    const children = nodes.filter(n => n.parentId === group.id)
-    const width = group.data.collapsed ? 280 : Math.max(Number(group.style?.width) || 280, ...children.map(n => n.position.x + (Number(n.style?.width) || n.measured?.width || 340) + 28))
-    const height = group.data.collapsed ? 330 : Math.max(Number(group.style?.height) || 180, ...children.map(n => n.position.y + (Number(n.style?.height) || (!n.data.collapsed && (n.data.expandedSize as {height?:number})?.height) || n.measured?.height || 420) + 28))
-    if (width === group.style?.width && height === group.style?.height && (!group.data.collapsed || group.width === width && group.height === height)) return group
-    changed = true
-    return { ...group, width, height, style: { ...group.style, width, height } }
-  })
-  return changed ? next : nodes
+  let next = nodes
+  for (const original of nodes) {
+    if (original.data.kind !== 'group') continue
+    const group = next.find(n => n.id === original.id)!
+    const children = next.filter(n => n.parentId === group.id)
+    if (group.dragging || group.resizing || children.some(n => n.dragging || n.resizing)) continue
+    const folded = !!group.data.collapsed
+    if (!folded && !children.length) continue
+    const left = folded ? 0 : Math.min(...children.map(n => n.position.x)) - 28
+    const top = folded ? 0 : Math.min(...children.map(n => n.position.y)) - 64
+    const right = folded ? 280 : Math.max(...children.map(n => n.position.x + (n.measured?.width || Number(n.style?.width) || 340))) + 28
+    const bottom = folded ? 330 : Math.max(...children.map(n => n.position.y + (n.measured?.height || Number(n.style?.height) || 420))) + 28
+    const width = folded ? 280 : Math.max(280, right - left)
+    const height = folded ? 330 : Math.max(180, bottom - top)
+    const saved = group.data.expandedSize as {width?:number;height?:number}|undefined
+    if (left === 0 && top === 0 && width === group.style?.width && height === group.style?.height && group.width === width && group.height === height && (folded || saved?.width === width && saved?.height === height)) continue
+    next = next.map(n => n.id === group.id ? {
+      ...n, position: { x: n.position.x + left, y: n.position.y + top }, width, height,
+      measured: { ...n.measured, width, height }, style: { ...n.style, width, height },
+      data: folded ? n.data : { ...n.data, expandedSize: { width, height } },
+    } : n.parentId === group.id && (left !== 0 || top !== 0) ? {
+      ...n, position: { x: n.position.x - left, y: n.position.y - top },
+    } : n)
+  }
+  return next
 }
 
 export function absolutePosition(id: string, nodes: Node[]) {

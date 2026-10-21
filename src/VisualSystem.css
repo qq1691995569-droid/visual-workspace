@@ -1,0 +1,470 @@
+/* Shared visual hierarchy; light-dark paints in component styles follow this scheme. */
+:root {
+  color-scheme: light;
+  --ui-canvas: #f1f3f6;
+  --ui-panel: #ffffff;
+  --ui-field: #f5f6f8;
+  --ui-border: #dce1e8;
+  --ui-ink: #202936;
+  --ui-secondary: #526173;
+  --ui-muted: #6b7788;
+  --ui-accent: #4268cc;
+  --ui-selected: #eaf0ff;
+  --ui-shadow: 0 6px 24px #1c293514, 0 1px 3px #1c293508;
+  --text-micro: 11px; --text-caption: 12px; --text-label: 13px;
+  --text-body: 14px; --text-control: 14px; --text-title: 16px; --text-heading: 18px;
+  --surface: var(--ui-panel); --line: var(--ui-border); --muted: var(--ui-muted);
+  --raised: var(--ui-shadow); --inset: none;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --ui-canvas: #15181d;
+  --ui-panel: #242830;
+  --ui-field: #1c2027;
+  --ui-border: #3b424e;
+  --ui-ink: #edf0f5;
+  --ui-secondary: #bdc6d4;
+  --ui-muted: #9ca8ba;
+  --ui-accent: #97b3ff;
+  --ui-selected: #303f61;
+  --ui-shadow: 0 8px 28px #00000040, 0 1px 3px #00000030;
+}
+html body { color: var(--ui-ink); background: var(--ui-canvas); }
+.app-shell { background: var(--ui-canvas); color: var(--ui-ink); }
+.app-shell main { background: transparent; }
+.app-shell .canvas-surface { --canvas-dot-color: light-dark(#c5ccd7, #39414e); }
+.app-shell header, .app-shell .history-controls, .app-shell .header-actions,
+.app-shell .tool-rail, .app-shell .image-toolbar, .app-shell .selection-toolbar,
+.app-shell .react-flow__controls, .app-shell .creation-dock,
+.app-shell .context-menu, .app-shell .parameter-popover {
+  background: var(--ui-panel); border: 1px solid var(--ui-border);
+  box-shadow: var(--ui-shadow); color: var(--ui-ink);
+}
+.app-shell header { border-radius: 14px; height: 52px; }
+.app-shell .project-name input { font-size: 15px; font-weight: 650; color: var(--ui-ink); }
+.app-shell .project-name small { font-size: 11px; color: var(--ui-muted); }
+.app-shell .brand-mark { background: var(--ui-field); color: var(--ui-ink); box-shadow: none; }
+.app-shell .card:not(.clean-image), .app-shell .workflow-group {
+  background: var(--ui-panel); border-color: var(--ui-border); box-shadow: var(--ui-shadow); border-radius: 16px;
+}
+.app-shell .card-title { color: var(--ui-ink); font-size: 15px; font-weight: 650; }
+.app-shell .skill-body { color: var(--ui-secondary); line-height: 1.6; }
+.app-shell .skill-input-label { color: var(--ui-ink); font-size: 13px; }
+.app-shell :is(input,textarea,select) { caret-color: var(--ui-accent); }
+.app-shell :is(textarea,select) { background-color: var(--ui-field); color: var(--ui-ink); border-color: var(--ui-border); }
+.app-shell textarea::placeholder { color: var(--ui-muted); }
+.app-shell button:focus-visible, .app-shell input:focus-visible, .app-shell :is(select,.canvas-select):focus-visible, .app-shell textarea:focus-visible {
+  outline: 2px solid var(--ui-accent); outline-offset: 3px;
+}
+.app-shell .creation-dock { border-radius: 18px; padding: 18px 20px 14px; }
+.app-shell .creation-dock .dock-heading strong { font-size: 16px; color: var(--ui-ink); }
+.app-shell .creation-dock .dock-heading button { font-size: 13px; color: var(--ui-secondary); }
+.app-shell .creation-dock:not(.minimized) .creation-input {
+  background: var(--ui-field); border: 1px solid var(--ui-border); border-radius: 14px;
+  padding: 14px 16px; box-shadow: var(--ui-inset);
+  transition: border-color .15s, box-shadow .15s;
+}
+.app-shell .creation-dock:not(.minimized) .creation-input:focus-within {
+  background: var(--ui-field); border-color: var(--ui-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 12%, transparent);
+}
+.app-shell .creation-dock:not(.minimized) .creation-input textarea {
+  background: transparent; border: 0; border-radius: 0; padding: 0; margin: 0;
+  box-shadow: none; outline: none; width: 100%; display: block;
+}
+.app-shell .creation-dock:not(.minimized) .creation-input textarea:focus {
+  background: transparent; border: 0; box-shadow: none;
+}
+.app-shell .creation-dock .creation-input textarea { font-size: 15px; color: var(--ui-ink); line-height: 1.7; }
+.app-shell .creation-dock .parameter-trigger { font-size: 13px; min-height: 36px; background: var(--ui-panel); color: var(--ui-secondary); border-color: var(--ui-border); }
+.app-shell .creation-dock .composer-reference-tray { background: var(--ui-panel); border-color: var(--ui-border); padding: 10px 12px; }
+.app-shell .creation-dock .composer-reference-tray small { color: var(--ui-muted); font-size: 11px; }
+.app-shell .creation-dock .dock-status { color: var(--ui-muted); font-size: 12px; }
+.app-shell button.primary:not(:disabled), .app-shell .creation-dock .dock-submit:not(:disabled) {
+  background: light-dark(#293445, #dce6fb); border-color: transparent;
+  color: light-dark(#ffffff, #182132); box-shadow: none; font-weight: 600;
+}
+.app-shell button.primary:hover:not(:disabled) { background: light-dark(#3b4b62, #bed1fa); }
+.app-shell .react-flow__controls { border-radius: 12px; padding: 4px; gap: 2px; }
+.app-shell .react-flow__controls-button { width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: var(--ui-secondary); }
+.app-shell .react-flow__controls-button:hover { background: var(--ui-selected); color: var(--ui-accent); }
+.app-shell .react-flow__controls-button svg { fill: currentColor; }
+.app-shell .react-flow__controls-button.theme-toggle { margin-left: 4px; border-left: 1px solid var(--ui-border); border-radius: 0 8px 8px 0; }
+.app-shell .react-flow__controls-button.theme-toggle svg { fill: none; stroke: currentColor; }
+.app-shell .canvas-hint { color: var(--ui-muted); }
+.app-shell .canvas-hint { left: 196px; bottom: 30px; }
+.app-shell .header-actions { background: transparent; border: 0; box-shadow: none; }
+.app-shell .creation-dock .dock-heading .composer-mode-tabs button[aria-pressed='true'],
+.app-shell .creation-dock .creation-modes button.chosen {
+  background: var(--ui-selected); color: var(--ui-accent); font-weight: 600;
+}
+:root[data-theme='dark'] .react-flow__minimap { background: var(--ui-panel); }
+/* Raised cards, inset editors and capsule controls share one material. */
+:root {
+  --ui-panel: #eef1f4;
+  --ui-field: #e7ebef;
+  --ui-border: #e0e5ea;
+  --ui-shadow: 8px 10px 22px #b5bfc84a, -5px -5px 16px #ffffffeb;
+  --ui-pill-shadow: 3px 4px 8px #aeb9c64a, -3px -3px 8px #ffffffed;
+  --ui-inset: inset 2px 3px 6px #acb8c633, inset -2px -2px 5px #ffffffa6;
+}
+:root[data-theme='dark'] {
+  --ui-panel: #25292e; --ui-field: #1e2227; --ui-border: #30363d;
+  --ui-shadow: 8px 10px 22px #00000055, -3px -3px 12px #3d444326;
+  --ui-pill-shadow: 3px 4px 8px #00000050, -2px -2px 6px #48505a25;
+  --ui-inset: inset 2px 3px 6px #00000040, inset -1px -1px 3px #4b536322;
+}
+.app-shell .card:not(.clean-image) { border-radius: 22px; border: 1px solid var(--ui-border); }
+.app-shell .card-title { min-height: 56px; padding: 15px 18px 12px; border: 0; background: transparent; }
+.app-shell .card-title>span { gap: 10px; font-size: 16px; font-weight: 700; }
+.app-shell .card-title>span>svg { box-sizing: content-box; padding: 9px; border-radius: 50%; background: var(--ui-panel); box-shadow: var(--ui-pill-shadow); }
+.app-shell .skill-body, .app-shell .tool-body { padding: 10px 18px 20px; }
+.app-shell .skill-body :is(select,.canvas-select), .app-shell .tone-image-select { border-radius: 14px; padding: 9px 11px; background: var(--ui-panel); box-shadow: var(--ui-pill-shadow); border: 1px solid var(--ui-border); }
+.app-shell :is(.skill-protection,.skill-plan,.tool-body) textarea { border-radius: 14px; box-shadow: var(--ui-inset); }
+.app-shell .lighting-controls { border: 0; padding: 0; background: transparent; }
+.app-shell .lighting-module { border: 0; border-radius: 17px; background: var(--ui-panel); box-shadow: var(--ui-pill-shadow); padding: 10px 8px; margin-bottom: 10px; }
+.app-shell .lighting-module-label { font-weight: 650; color: var(--ui-ink); }
+.app-shell .lighting-controls .lighting-switch { width: 34px; flex-basis: 34px; height: 20px; background: var(--ui-field); box-shadow: var(--ui-inset); }
+.app-shell .lighting-switch span { width: 16px; height: 16px; background: light-dark(#fff,#d9e1ee); }
+.app-shell .lighting-switch[aria-checked=true] span { transform: translateX(14px); }
+.app-shell .lighting-module.blocked { opacity: .55; box-shadow: var(--ui-inset); }
+.app-shell .generation-controls { padding: 5px; gap: 5px; border-radius: 24px; background: var(--ui-panel); box-shadow: var(--ui-pill-shadow); }
+.app-shell .parameter-trigger, .app-shell .creation-dock .parameter-trigger { border-radius: 20px; border-color: transparent; background: transparent; min-height: 36px; padding: 8px 12px; }
+.app-shell .parameter-trigger:hover, .app-shell .parameter-trigger.expanded { box-shadow: var(--ui-inset); }
+.app-shell .parameter-popover { border-radius: 18px; padding: 14px; background: var(--ui-panel); }
+.app-shell .model-list button { border-radius: 12px; margin-bottom: 5px; padding: 11px 12px; }
+.app-shell .model-list button:hover { background: var(--ui-field); box-shadow: var(--ui-inset); }
+.app-shell .creation-dock .dock-submit, .app-shell .node-run, .app-shell .skill-run { border-radius: 24px; min-height: 42px; }
+.app-shell .context-menu { border-radius: 22px; padding: 12px; }
+.app-shell .context-menu button { border-radius: 12px; min-height: 42px; padding: 10px 13px; }
+.app-shell .context-menu button:hover { background: var(--ui-field); box-shadow: var(--ui-inset); }
+.app-shell .tool-menu { background: var(--ui-panel); color: var(--ui-ink); border: 1px solid var(--ui-border); border-radius: 22px; padding: 12px; box-shadow: var(--ui-shadow); }
+.app-shell .tool-menu>button { border-radius: 12px; min-height: 48px; padding: 10px 12px; color: var(--ui-ink); }
+.app-shell .tool-menu>button:hover { background: var(--ui-field); box-shadow: var(--ui-inset); }
+.app-shell .tool-menu small { color: var(--ui-muted); font-size: 11px; line-height: 1.5; margin-top: 3px; }
+/* Frame lives outside the image geometry, so masks and original aspect ratios stay aligned. */
+.app-shell .card.clean-image:not(.folded-image) { background: transparent; border: 0; border-radius: 16px!important; box-shadow: 0 0 0 3px light-dark(#ffffffeb,#424a55), 0 6px 10px -3px light-dark(#2433432e,#00000066), 0 18px 28px -8px light-dark(#24334338,#0000008c)!important; }
+.app-shell .clean-image .image-body { border-radius: 14px; overflow: hidden; }
+.app-shell .clean-image.active { outline: 2px solid var(--ui-accent)!important; outline-offset: 6px; }
+.react-flow__nodes:has(.dragging) .react-flow__node:not(.dragging) { transition: transform 160ms cubic-bezier(.2,.8,.2,1); }
+@media(prefers-reduced-motion:reduce) { .react-flow__nodes:has(.dragging) .react-flow__node { transition: none; } }
+.project-manager { background: var(--ui-canvas); color: var(--ui-ink); }
+.project-manager .pm-hero { background: transparent; border: 0; padding: 18px 0 26px; }
+.project-manager .pm-hero h1 { font-size: 32px; font-weight: 750; }
+.project-manager .pm-card, .project-manager .pm-create-tile { border-radius: 24px; background: var(--ui-panel); border: 1px solid var(--ui-border); box-shadow: var(--ui-shadow); overflow: hidden; }
+.project-manager .pm-cover { border-radius: 20px 20px 12px 12px; margin: 8px; }
+.project-manager .pm-tools label { background: var(--ui-field); border: 0; border-radius: 22px; box-shadow: var(--ui-inset); }
+.project-manager button { border-radius: 20px; background: var(--ui-panel); box-shadow: var(--ui-pill-shadow); }
+.project-manager .pm-card-title { color: var(--ui-ink); font-size: 16px; font-weight: 650; }
+.tone-overlay .tone-window { border-radius: 24px; background: var(--ui-panel); border-color: var(--ui-border); }
+.tone-overlay .tone-header { background: var(--ui-panel); color: var(--ui-ink); padding: 16px 22px; }
+.tone-header strong { font-size: 18px; }
+.tone-header button { padding: 9px; border-radius: 50%; background: var(--ui-panel); box-shadow: var(--ui-pill-shadow); }
+/* Peripheral controls: larger icons and comfortable targets without enlarging node controls. */
+.app-shell .canvas-rail>button { width: 42px; height: 42px; border-radius: 12px; }
+.app-shell .canvas-rail>button svg { width: 22px; height: 22px; }
+.app-shell .header-actions { height: 46px; }
+.app-shell .header-actions>button { min-height: 44px; padding: 11px 14px; gap: 9px; font-size: 13px; }
+.app-shell .header-actions>button svg { width: 20px; height: 20px; }
+.app-shell .react-flow__controls-button { width: 38px; height: 38px; }
+.app-shell .react-flow__controls-button svg { width: 18px; height: 18px; max-width: 20px; max-height: 20px; }
+.app-shell .react-flow__controls-button.theme-toggle svg { width: 21px; height: 21px; max-width: 22px; max-height: 22px; }
+.app-shell .history-controls button { min-width: 36px; min-height: 36px; }
+.app-shell .history-controls button svg { width: 20px; height: 20px; }
+.app-shell .canvas-hint { left: 222px; }
+/* Add-to-canvas menu: names lead, descriptions support, in both themes. */
+.app-shell .tool-menu {
+  width: min(312px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  padding: 14px;
+  scrollbar-width: thin;
+}
+.app-shell .tool-menu .menu-title {
+  color: var(--ui-muted); font-size: 12px; font-weight: 500;
+  padding: 4px 8px 14px; margin-bottom: 6px;
+  border-bottom: 1px solid var(--ui-border);
+}
+.app-shell .tool-menu>button {
+  min-height: 70px; padding: 14px 12px; gap: 12px;
+  margin: 3px 0; border-radius: 14px;
+  color: var(--ui-ink);
+}
+.app-shell .tool-menu>button>span {
+  font-size: 17px; font-weight: 700; line-height: 1.4;
+  color: light-dark(#202b3a, #edf2fa);
+}
+.app-shell .tool-menu>button small {
+  margin-top: 5px; font-size: 12px; line-height: 1.5;
+  font-weight: 400; color: light-dark(#657184, #aab7c9);
+}
+.app-shell .tool-menu>button>svg:first-child { width: 21px; height: 21px; color: var(--ui-ink); }
+.app-shell .tool-menu>button>svg:last-child { width: 14px; height: 14px; color: var(--ui-muted); }
+.app-shell .tool-menu>button:hover,
+.app-shell .tool-menu>button:focus-visible { background: var(--ui-field); box-shadow: var(--ui-inset); }
+/* Shared input anatomy across material, replacement, style, lighting and tone nodes. */
+.app-shell .compact-skill .skill-input-row {
+  display: flex; flex-direction: column; align-items: stretch;
+  gap: 8px; height: auto; min-height: 0; overflow: visible; margin: 0 0 18px;
+}
+.app-shell .skill-field-label,
+.app-shell .skill-binding-heading>span,
+.app-shell .tone-field-heading {
+  font-size: 13px; font-weight: 600; color: var(--ui-secondary); line-height: 1.5;
+}
+.app-shell .skill-input-surface {
+  display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 64px;
+  padding: 10px 12px; background: var(--ui-panel); border: 1px solid var(--ui-border);
+  border-radius: 16px; box-shadow: var(--ui-pill-shadow);
+}
+.app-shell .skill-input-surface .skill-thumbnail { width: 40px; height: 40px; object-fit: cover; border-radius: 9px; }
+.app-shell .skill-input-surface .asset-binding-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 500; color: var(--ui-ink); }
+.app-shell .skill-input-surface :is(select,.canvas-select) { flex: 1; width: 0; min-width: 0; background: transparent; border: 0; box-shadow: none; color: var(--ui-ink); font-size: 14px; padding: 8px 0; }
+.app-shell .skill-input-row.references .skill-input-surface { flex-wrap: wrap; }
+.app-shell .skill-input-surface small { font-size: 12px; color: var(--ui-muted); line-height: 1.6; }
+.app-shell .skill-binding-field, .app-shell .tone-image-field { margin-bottom: 18px; }
+.app-shell .skill-binding-heading, .app-shell .tone-field-heading { min-height: 22px; margin-bottom: 8px; }
+.app-shell .skill-body button.skill-binding-card, .app-shell .tone-image-select {
+  min-height: 64px; padding: 12px; background: var(--ui-panel); border: 1px solid var(--ui-border);
+  border-radius: 16px; box-shadow: var(--ui-pill-shadow); color: var(--ui-ink);
+}
+.app-shell .skill-binding-empty { font-size: 13px; line-height: 1.65; color: var(--ui-muted); }
+.app-shell .skill-body button.skill-binding-card:hover:not(:disabled), .app-shell .tone-image-select:hover { border-color: var(--ui-accent); }
+.app-shell .tone-image-name { color: var(--ui-ink); font-size: 14px; font-weight: 500; }
+.app-shell .skill-public-options>label, .app-shell .skill-public-options>div>label, .app-shell .skill-supplement { color: var(--ui-secondary); font-size: 13px; font-weight: 600; }
+.app-shell .skill-public-options :is(select,.canvas-select), .app-shell .skill-supplement textarea { font-weight: 400; color: var(--ui-ink); }
+@media (max-width: 700px) {
+  .app-shell .creation-dock { width: calc(100vw - 32px); max-width: calc(100vw - 32px); padding: 14px; bottom: 70px; }
+  .app-shell .creation-dock .dock-footer { flex-wrap: wrap; }
+  .app-shell .canvas-hint { display: none; }
+}
+
+/* Tone workbench heading shares the canvas typography hierarchy. */
+.tone-window>.tone-header{min-height:76px;padding:18px 24px!important;gap:16px}
+.tone-window>.tone-header strong{font-size:22px;font-weight:750;letter-spacing:-.4px;color:var(--ui-ink)}
+.tone-window>.tone-header span{font-size:12px;color:var(--ui-secondary)}
+.tone-window>.tone-header button{width:40px;height:40px;border-radius:50%}
+
+/* Compact selection layout actions, shared by both themes. */
+.app-shell .selection-bar.selection-tools{display:flex;align-items:center;gap:6px;padding:7px 8px 7px 14px;border:1px solid var(--ui-border);border-radius:18px;background:var(--ui-panel);box-shadow:var(--ui-shadow)}
+.selection-tools .selection-count{font-size:12px;font-weight:550;color:var(--ui-muted);padding-right:12px;margin-right:2px;border-right:1px solid var(--ui-border);white-space:nowrap}
+.app-shell .selection-tools button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:38px;padding:8px 13px;border:1px solid transparent;border-radius:12px;background:transparent;color:var(--ui-ink);font-size:13px;font-weight:650;transition:background .15s,box-shadow .15s}
+.app-shell .selection-tools button:hover:not(:disabled){background:var(--ui-field);box-shadow:var(--ui-inset)}
+.app-shell .selection-tools button:focus-visible{outline:2px solid var(--ui-accent);outline-offset:2px}
+.app-shell .selection-tools button:disabled{opacity:.4;cursor:not-allowed}
+.app-shell .selection-tools button svg{width:18px;height:18px;stroke-width:1.8}
+.app-shell .selection-bar.selection-tools{left:auto;width:max-content;min-width:0;max-width:calc(100vw - 40px)}
+
+/* Reusable side-panel primitives. New tools share these semantic classes. */
+.ui-side-panel{--panel-radius:24px;--panel-space:20px;--panel-card-radius:18px;--panel-heading-size:20px;background:var(--ui-panel);color:var(--ui-ink);border:1px solid var(--ui-border);border-radius:var(--panel-radius);box-shadow:var(--ui-shadow)}
+.ui-side-panel .ui-panel-header{background:var(--ui-panel);border-bottom:1px solid var(--ui-border);padding:20px;gap:10px}
+.ui-panel-header strong{font-size:var(--panel-heading-size);font-weight:750;color:var(--ui-ink);line-height:1.4}
+.ui-panel-header small{font-size:12px;color:var(--ui-muted);line-height:1.6;margin-top:4px}
+.ui-panel-header>div>svg{box-sizing:content-box;padding:12px;border-radius:14px;background:var(--ui-panel);box-shadow:var(--ui-pill-shadow);color:var(--ui-secondary);width:22px;height:22px;flex-shrink:0}
+.ui-side-panel .ui-panel-header>button{width:34px;height:34px;padding:8px;border-radius:11px;background:transparent;color:var(--ui-secondary);border:1px solid transparent}
+.ui-side-panel .ui-panel-header>button:hover{background:var(--ui-field);color:var(--ui-ink)}
+.ui-side-panel .ui-panel-tabs{display:flex;gap:4px;padding:5px;background:var(--ui-field);border:1px solid var(--ui-border);border-radius:15px;box-shadow:var(--ui-inset);flex-shrink:0}
+.ui-side-panel .ui-panel-tabs button{flex:1;justify-content:center;gap:5px;min-height:38px;padding:7px 8px;font-size:12px;font-weight:600;color:var(--ui-secondary);border:1px solid transparent;border-radius:11px;background:transparent;white-space:nowrap}
+.ui-side-panel .ui-panel-tabs button.active{background:var(--ui-panel);color:var(--ui-ink);border-color:var(--ui-border);box-shadow:0 2px 6px light-dark(#26314014,#0004)}
+.ui-side-panel .ui-panel-footer{border-top:1px solid var(--ui-border);padding:16px 0 4px;gap:10px;align-items:center;color:var(--ui-muted);font-size:12px}
+.ui-side-panel .ui-panel-footer button{min-height:34px;padding:7px 12px;border-radius:12px;background:var(--ui-panel);border:1px solid var(--ui-border);color:var(--ui-ink);font-size:12px;font-weight:600;box-shadow:var(--ui-pill-shadow)}
+.asset-browser .asset-library-column{padding:18px 20px;gap:16px;background:var(--ui-panel)}
+.asset-browser .asset-library-actions>label{min-height:42px;background:var(--ui-field);border:1px solid var(--ui-border);border-radius:13px;box-shadow:var(--ui-inset);color:var(--ui-muted)}
+.asset-browser .asset-library-actions input{color:var(--ui-ink);background:transparent}
+.asset-browser .asset-list-heading strong{font-size:14px;font-weight:700;color:var(--ui-ink)}
+.asset-browser .asset-list-heading span{color:var(--ui-muted);font-size:12px}
+.asset-browser .asset-category-home{grid-template-columns:1fr!important;gap:14px;align-content:start}
+.asset-browser .asset-category-home .ui-panel-card{display:grid;grid-template-columns:100px minmax(0,1fr);grid-template-rows:auto auto auto;column-gap:16px;align-items:center;padding:14px;border-radius:var(--panel-card-radius);border:1px solid var(--ui-border);background:light-dark(#f8fafb,#2b3037);box-shadow:0 4px 12px light-dark(#2631400d,#0003);text-align:left;transition:border-color .15s,background .15s}
+.asset-browser .asset-category-home .ui-panel-card:hover{border-color:var(--ui-accent);background:var(--ui-panel)}
+.asset-browser .asset-category-card>img,.asset-browser .asset-category-card>.asset-category-placeholder{grid-column:1;grid-row:1/4;width:100px;height:100px;aspect-ratio:1;border-radius:13px;background:var(--ui-field);color:var(--ui-secondary);object-fit:cover;box-shadow:var(--ui-inset)}
+.asset-browser .asset-category-card>strong{grid-column:2;padding:0;font-size:16px;font-weight:750;color:var(--ui-ink);white-space:normal}
+.asset-browser .asset-category-card .asset-card-description{grid-column:2;padding:0!important;font-size:12px!important;line-height:1.6;color:var(--ui-secondary)}
+.asset-browser .asset-category-card .asset-category-footer{grid-column:2;margin:0;padding:0;border:0;display:flex;justify-content:space-between;color:var(--ui-muted);font-size:12px}
+.asset-browser .asset-tile:not(.asset-category-card){border-radius:18px;background:var(--ui-panel);border-color:var(--ui-border);box-shadow:0 3px 10px light-dark(#2631400b,#0003)}
+.asset-browser .asset-empty{color:var(--ui-muted)}
+.asset-browser .asset-empty strong{color:var(--ui-secondary);font-size:15px}
+.ui-side-panel button:focus-visible{outline:2px solid var(--ui-accent);outline-offset:2px}
+@media(max-width:600px){.ui-side-panel .ui-panel-tabs{flex-wrap:wrap}.ui-side-panel .ui-panel-tabs button{flex-basis:40%}.asset-browser .asset-category-home .ui-panel-card{grid-template-columns:76px minmax(0,1fr);gap:10px}.asset-browser .asset-category-card>img,.asset-browser .asset-category-card>.asset-category-placeholder{width:76px;height:90px}}
+.asset-browser .asset-workspace.ui-side-panel{background:var(--ui-panel);border-color:var(--ui-border);border-radius:var(--panel-radius);box-shadow:var(--ui-shadow)} .ui-side-panel .ui-panel-header,.asset-browser .asset-library-column{padding:var(--panel-space)}
+
+/* Workflow wires stay legible at every canvas zoom level. */
+:root{--ui-wire:#8693a3;--ui-wire-width:2.25px}
+:root[data-theme="dark"]{--ui-wire:#9aa9bd}
+.app-shell .react-flow__edge-path,
+.app-shell .react-flow__connection-path{
+  stroke:var(--ui-wire)!important;stroke-width:var(--ui-wire-width)!important;
+  stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke;
+  transition:stroke .15s,stroke-width .15s;
+}
+.app-shell .react-flow__edge:hover .react-flow__edge-path,
+.app-shell .react-flow__edge.selected .react-flow__edge-path,
+.app-shell .react-flow__edge:focus-visible .react-flow__edge-path{
+  stroke:var(--ui-accent)!important;stroke-width:3px!important;
+}
+.app-shell .react-flow__connection-path{stroke:var(--ui-accent)!important}
+
+/* React Flow scales the SVG's HTML ancestor, so compensate for viewport zoom. */
+.app-shell .react-flow__edge-path{vector-effect:none;stroke-width:calc(var(--ui-wire-width) * var(--wire-scale,1))!important;transition:stroke .15s}
+.app-shell .react-flow__edge:hover .react-flow__edge-path,.app-shell .react-flow__edge.selected .react-flow__edge-path,.app-shell .react-flow__edge:focus-visible .react-flow__edge-path{stroke-width:calc(3px * var(--wire-scale,1))!important}
+
+/* Folded workflow collection: shared panel shell and a contained image cover. */
+.app-shell .workflow-group.collection-folded{display:grid;grid-template-rows:56px minmax(0,1fr) 68px;box-sizing:border-box;padding:0;background:var(--ui-panel);border:1px solid var(--ui-border);border-radius:20px;box-shadow:var(--ui-shadow);color:var(--ui-ink)}
+.app-shell .workflow-group.collection-folded.selected{border-color:var(--ui-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--ui-accent) 18%,transparent),var(--ui-shadow)}
+.app-shell .collection-folded .group-heading{height:56px;padding:12px 14px;gap:10px;align-items:center}
+.collection-icon{display:grid;place-items:center;width:30px;height:30px;flex:0 0 30px;border-radius:10px;background:var(--ui-field);color:var(--ui-secondary);box-shadow:var(--ui-inset)}
+.app-shell .collection-folded .group-heading input{font-size:16px;line-height:1.4;font-weight:750;color:var(--ui-ink);background:transparent;border:1px solid transparent;border-radius:6px;padding:3px 0;letter-spacing:0}
+.app-shell .collection-folded .group-heading input:focus{border-color:var(--ui-accent);background:var(--ui-field)}
+.app-shell .collection-folded .group-heading button{width:28px;height:28px;min-width:28px;padding:6px;border-radius:9px;border:1px solid var(--ui-border);background:var(--ui-panel);color:var(--ui-secondary);box-shadow:var(--ui-pill-shadow)}
+.app-shell .collection-folded .collection-cover{height:auto;min-height:0;margin:0 14px;border-radius:13px;background:var(--ui-field);border:1px solid var(--ui-border);box-shadow:var(--ui-inset);overflow:hidden}
+.app-shell .collection-folded .collection-footer{padding:12px 14px;gap:10px;color:var(--ui-secondary);font-size:12px;align-items:center}
+.collection-summary{display:flex;flex-direction:column;gap:4px;min-width:0}
+.collection-count{font-size:12px;color:var(--ui-secondary)}
+.collection-count b{font-size:15px;font-weight:700;color:var(--ui-ink);font-variant-numeric:tabular-nums}
+.app-shell .collection-folded .collection-status{padding:0;gap:5px;font-size:10px;color:var(--ui-muted);line-height:1.4}
+.app-shell .collection-folded .collection-footer button{min-height:32px;display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:11px;background:var(--ui-panel);border:1px solid var(--ui-border);color:var(--ui-ink);font-size:12px;font-weight:650;box-shadow:var(--ui-pill-shadow)}
+.app-shell .collection-folded .collection-footer button:hover{background:var(--ui-field);box-shadow:var(--ui-inset)}
+.app-shell .collection-folded .group-heading>.collection-icon{display:grid;flex:0 0 30px;width:30px;min-width:30px;max-width:30px;height:30px;padding:0;gap:0}
+
+/* Group boundaries remain identifiable when the canvas is zoomed out. */
+.app-shell .workflow-group{--group-outline:light-dark(#8293a9,#7a8fa9);--group-halo:light-dark(#d9e1ec,#303c4d);position:relative}
+.app-shell .workflow-group:not(.collection-folded){background:light-dark(#e7ecf2,#202731);border-color:transparent;box-shadow:none}
+.app-shell .workflow-group::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;border:calc(1.6px * var(--group-edge-scale,1)) solid var(--group-outline);box-shadow:0 0 0 calc(3px * var(--group-edge-scale,1)) color-mix(in srgb,var(--group-halo) 65%,transparent),0 calc(5px * var(--group-edge-scale,1)) calc(14px * var(--group-edge-scale,1)) light-dark(#24334322,#0006),inset 0 0 0 calc(1px * var(--group-edge-scale,1)) light-dark(#ffffffbd,#ffffff10)}
+.app-shell .workflow-group:not(.collection-folded)::after{border-style:dashed}
+.app-shell .workflow-group.selected{--group-outline:var(--ui-accent)}
+.app-shell .workflow-group:not(.collection-folded) .group-heading{background:light-dark(#dce4ee,#2d394a);border-radius:12px;color:var(--ui-ink)}
+.app-shell .workflow-group:not(.collection-folded) .group-caption{opacity:1;color:var(--ui-secondary)}
+/* Image actions stay inside the image's horizontal bounds. */
+.image-toolbar.bounded-image-toolbar{position:fixed;box-sizing:border-box;display:block;min-width:0;max-width:none;padding:4px;border-radius:12px;overflow:visible;background:var(--ui-panel)!important;color:var(--ui-ink);box-shadow:var(--ui-shadow);border:1px solid var(--ui-border);z-index:30}
+.bounded-image-toolbar .image-toolbar-row{display:flex;align-items:center;gap:2px;height:32px;overflow:hidden}
+.bounded-image-toolbar .image-toolbar-row button{display:flex;align-items:center;justify-content:center;gap:5px;flex:1 1 82px;min-width:0;height:32px;padding:5px;font-size:12px;color:var(--ui-ink);border-radius:8px;overflow:hidden}
+.bounded-image-toolbar button svg{flex-shrink:0;width:16px;height:16px}
+.bounded-image-toolbar .image-toolbar-row .image-toolbar-more{flex:0 1 34px;margin-left:auto}
+.bounded-image-toolbar .image-toolbar-overflow{position:absolute;top:calc(100% + 5px);left:0;right:0;box-sizing:border-box;padding:5px;overflow:auto;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-panel);box-shadow:var(--ui-shadow)}
+.bounded-image-toolbar .image-toolbar-overflow button{display:flex;align-items:center;gap:9px;width:100%;min-width:0;padding:10px 8px;font-size:13px;color:var(--ui-ink);text-align:left;overflow:hidden}
+.bounded-image-toolbar button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bounded-image-toolbar button:hover{background:var(--ui-field)}
+.bounded-image-toolbar button:focus-visible{outline:2px solid var(--ui-accent);outline-offset:-2px}
+.card.clean-image .image-dimensions{inset:auto 0 0;transform:none;margin:0;box-sizing:border-box;display:flex;justify-content:space-between;align-items:flex-end;gap:4px;width:100%;max-width:100%;padding:calc(8px * var(--image-meta-scale,1));padding-top:calc(22px * var(--image-meta-scale,1));border:0;border-radius:0 0 16px 16px;box-shadow:none;background:linear-gradient(transparent,rgba(0,0,0,.34));color:white;font-size:calc(11px * var(--image-meta-scale,1));line-height:1.4;pointer-events:none;overflow:hidden}
+.card.clean-image .image-dimensions>span{padding:2px 5px;border-radius:5px;background:rgba(20,25,32,.48);color:white;text-shadow:0 1px 2px #0008;overflow:hidden;text-overflow:ellipsis}
+.card.clean-image .image-dimensions small{color:inherit;font-size:.85em}
+.card.clean-image .image-aspect-ratio{flex-shrink:0}
+/* Image ports: stable edge anchor plus a visible, zoom-independent grip. */
+.app-shell .card.clean-image .react-flow__handle.canvas-connection-port{width:1px!important;height:1px!important;min-width:0!important;min-height:0!important}
+.app-shell .card.clean-image .canvas-connection-port.react-flow__handle-right{right:0!important;transform:translate(50%,-50%);opacity:1;pointer-events:auto}
+.app-shell .card.clean-image .canvas-connection-port.react-flow__handle-left{left:0!important;transform:translate(-50%,-50%)}
+.app-shell .card.clean-image .canvas-connection-port.source:after{width:12px;height:30px;border-radius:8px;border:1px solid var(--ui-border);background:var(--ui-panel);box-shadow:0 2px 6px #0003;transform:translate(-50%,-50%) scale(var(--port-scale,1));opacity:1}
+.app-shell .card.clean-image .canvas-connection-port.source:before{width:4px;height:4px;border-radius:50%;background:var(--ui-secondary);z-index:1;pointer-events:none}
+.app-shell .card.clean-image .canvas-connection-port.source:hover:after,.app-shell .card.clean-image .canvas-connection-port.source.connectingfrom:after{border-color:var(--ui-accent);background:var(--ui-field);box-shadow:0 0 0 3px color-mix(in srgb,var(--ui-accent) 18%,transparent)}
+.app-shell .card.clean-image .canvas-connection-port.source.valid:after{border-color:#1baf83}
+.app-shell .card.clean-image .canvas-connection-port.source:after{pointer-events:auto;cursor:crosshair}
+/* Empty image nodes share the canvas card hierarchy. */
+.app-shell .image-generator-node{box-sizing:border-box;border:1px solid var(--ui-border);border-radius:18px;background:var(--ui-panel);color:var(--ui-ink);box-shadow:var(--ui-shadow);overflow:visible}
+.app-shell .image-generator-node.active{border-color:var(--ui-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--ui-accent) 22%,transparent),var(--ui-shadow)}
+.app-shell .image-generator-node .generator-ports{display:none}
+.generator-identity{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;max-width:100%;padding:12px;pointer-events:none}
+.generator-identity .generator-icon{display:grid;place-items:center;width:54px;height:54px;border-radius:16px;background:var(--ui-field);color:var(--ui-accent);box-shadow:var(--ui-inset)}
+.generator-identity strong{font-size:23px;font-weight:750;line-height:1.2;color:var(--ui-ink)}
+.app-shell .image-generator-node .generator-identity small{font-size:12px;font-weight:500;line-height:1.4;color:var(--ui-secondary);text-align:center}
+/* Selection feedback retains its screen weight at every canvas zoom. */
+.app-shell .clean-image.active{outline:calc(2.5px * var(--image-hover-scale,1)) solid var(--ui-accent)!important;outline-offset:calc(3px * var(--image-hover-scale,1))}
+.app-shell .card.clean-image.active:not(.folded-image){box-shadow:0 0 0 calc(7px * var(--image-hover-scale,1)) color-mix(in srgb,var(--ui-accent) 16%,transparent),0 6px 18px #24334338!important}
+.image-selection-badge{position:absolute;top:6px;left:6px;z-index:9;display:grid;place-items:center;width:18px;height:18px;border:1px solid var(--ui-border);border-radius:5px;background:var(--ui-panel);color:var(--ui-accent);box-shadow:none;transform:scale(min(1,var(--image-hover-scale,1)));transform-origin:top left;pointer-events:none;box-sizing:border-box}
+.app-shell .react-flow__selection{background:color-mix(in srgb,var(--ui-accent) 15%,transparent)!important;border:2px solid var(--ui-accent)!important;border-radius:8px;box-shadow:0 0 0 1px color-mix(in srgb,var(--ui-panel) 70%,transparent)}
+.app-shell .react-flow__nodesselection-rect{border-color:var(--ui-accent)!important;background:color-mix(in srgb,var(--ui-accent) 5%,transparent)!important}
+/* Selected image actions sit inside the frame, growing from icons as it zooms. */
+.image-toolbar.bounded-image-toolbar.inset-image-toolbar{padding:0;border:0;background:transparent!important;box-shadow:none!important;pointer-events:none;border-radius:0}
+.inset-image-toolbar .image-toolbar-row{justify-content:flex-end;gap:3px;height:28px;overflow:hidden}
+.bounded-image-toolbar.inset-image-toolbar .image-toolbar-row button{flex:0 0 27px;width:27px;height:27px;min-height:0;padding:5px;border-radius:8px;background:light-dark(#f7f9fbe8,#242a32eb);color:light-dark(#263446,#edf2fa);border:1px solid light-dark(#ffffffb3,#64718780);box-shadow:0 1px 4px #0002;pointer-events:auto;backdrop-filter:blur(8px)}
+.bounded-image-toolbar.inset-image-toolbar .image-toolbar-row .image-toolbar-more{flex:0 0 27px;margin-left:0}
+.inset-image-toolbar .image-toolbar-row button span{display:none}
+.bounded-image-toolbar.inset-image-toolbar .image-toolbar-row button:hover{background:var(--ui-panel);color:var(--ui-accent)}
+.inset-image-toolbar .image-toolbar-overflow{pointer-events:auto;top:33px;left:auto;width:min(190px,100%)}
+/* Compact above-image toolbar: empty layout space never catches canvas input. */
+.image-toolbar.bounded-image-toolbar.floating-image-toolbar{padding:0;border:0;background:transparent!important;box-shadow:none!important;pointer-events:none;border-radius:0}
+.floating-image-toolbar .image-toolbar-row{width:max-content;max-width:100%;box-sizing:border-box;margin:auto;height:36px;padding:3px;gap:2px;background:var(--ui-panel);border:1px solid var(--ui-border);border-radius:11px;box-shadow:0 3px 10px #0002;pointer-events:none}
+.bounded-image-toolbar.floating-image-toolbar .image-toolbar-row button{flex:0 0 auto;min-width:0;width:82px;height:28px;min-height:0;padding:5px;gap:5px;pointer-events:auto;font-size:12px;color:var(--ui-ink)}
+.bounded-image-toolbar.floating-image-toolbar.icons-only .image-toolbar-row button{width:30px}
+.floating-image-toolbar.icons-only .image-toolbar-row button span{display:none}
+.bounded-image-toolbar.floating-image-toolbar .image-toolbar-row .image-toolbar-more{width:30px;flex:0 0 30px;margin:0}
+.floating-image-toolbar .image-toolbar-overflow{pointer-events:auto;top:41px;left:50%;right:auto;transform:translateX(-50%);width:min(190px,100%)}
+.bounded-image-toolbar.floating-image-toolbar.show-labels .image-toolbar-row button:not(.image-toolbar-more){width:96px}.floating-image-toolbar.show-labels .image-toolbar-row button span{max-width:none;flex:0 0 auto;font-size:12px}
+/* All actions remain directly available, with full labels and natural wrapping. */
+.bounded-image-toolbar.floating-image-toolbar.all-image-actions .image-toolbar-row{display:flex;flex-wrap:wrap;justify-content:center;width:100%;height:auto;overflow:visible;gap:2px;padding:4px}
+.bounded-image-toolbar.floating-image-toolbar.all-image-actions .image-toolbar-row button{flex:1 1 90px;width:auto;max-width:110px;min-width:0;box-sizing:border-box;height:30px;overflow:visible}
+.all-image-actions .image-toolbar-row button span{display:inline!important;white-space:normal;overflow:visible;text-overflow:clip}
+/* Original one-line layout; its whole footprint follows canvas zoom. */
+.image-toolbar.single-row-image-toolbar{position:fixed;display:block;width:max-content;max-width:none!important;padding:4px 6px;border:1px solid var(--ui-border);border-radius:11px;background:var(--ui-panel)!important;box-shadow:0 3px 12px #0002;overflow:visible;pointer-events:none;z-index:30}
+.single-row-image-toolbar .image-toolbar-row{display:flex;flex-wrap:nowrap;align-items:center;gap:2px;width:max-content;height:32px;overflow:visible}
+.single-row-image-toolbar .image-toolbar-row button{display:flex;flex:0 0 auto;align-items:center;justify-content:center;gap:6px;width:auto;min-height:32px;padding:7px 9px;font-size:12px;color:var(--ui-ink);border-radius:7px;pointer-events:auto}
+.single-row-image-toolbar button span{display:inline!important;white-space:nowrap;overflow:visible;text-overflow:clip;max-width:none}
+.single-row-image-toolbar button svg{width:15px;height:15px;flex-shrink:0}
+.single-row-image-toolbar button:hover{background:var(--ui-field);color:var(--ui-accent)}
+.single-row-image-toolbar button:focus-visible{outline:2px solid var(--ui-accent);outline-offset:-2px}
+/* Shared canvas task notices, including image overlays and empty result nodes. */
+:root{--ui-notice-accent:light-dark(#9b651c,#e0b77c)}
+.canvas-task-notice{box-sizing:border-box;width:100%;padding:16px;text-align:left;border:1px solid var(--ui-border);border-radius:16px;background:var(--ui-panel);color:var(--ui-ink);box-shadow:var(--ui-shadow);font-size:13px;line-height:1.6;pointer-events:auto}
+.canvas-notice-heading{display:flex;align-items:center;gap:8px;color:var(--ui-ink)}
+.canvas-notice-heading svg{color:var(--ui-notice-accent);flex-shrink:0}
+.canvas-task-notice .canvas-notice-heading strong{font-size:15px;font-weight:700;color:var(--ui-ink);margin:0}
+.canvas-task-notice p{margin:9px 0;color:var(--ui-secondary);font-size:12px;font-weight:400;line-height:1.7}
+.canvas-task-notice details{font-size:12px;color:var(--ui-secondary);flex:1;min-width:0}
+.canvas-task-notice summary{cursor:pointer;color:var(--ui-accent);padding:3px 0}
+.canvas-task-notice details>div{max-height:130px;overflow:auto;overflow-wrap:anywhere;white-space:normal;margin-top:7px;font-weight:400}
+.app-shell .image-processing.generation-idle .processing-status{transform:translate(-50%,-50%);box-sizing:border-box;min-width:0;text-shadow:none;background:transparent;border:0;box-shadow:none;padding:0;width:calc(100% - 28px);max-width:300px;max-height:calc(100% - 24px);overflow:auto;border-radius:16px}
+.app-shell .image-processing.generation-idle .task-preview-shade{background:light-dark(#17233320,#080c1338);backdrop-filter:none}
+.app-shell .result-placeholder.generation-idle>.canvas-task-notice{max-width:300px;width:calc(100% - 24px)}
+.app-shell .generation-overlay>button{border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-panel);color:var(--ui-accent);padding:8px 14px;box-shadow:var(--ui-pill-shadow);font-size:12px}
+.app-shell .toast{background:var(--ui-panel);border:1px solid var(--ui-border);color:var(--ui-ink);box-shadow:var(--ui-shadow);border-radius:16px;padding:13px 16px;font-size:13px;line-height:1.6;max-width:min(480px,calc(100vw - 32px))}
+.app-shell .toast button{color:var(--ui-secondary);border-radius:8px;min-width:28px;min-height:28px}
+.app-shell .toast button:hover{background:var(--ui-field)}
+
+/* Error cards use node coordinates, never inverse-zoom enlargement. */
+.app-shell .image-processing.generation-idle .canvas-task-notice{min-width:0;max-width:100%;flex-shrink:0;overflow-wrap:anywhere;padding:12px;border-radius:12px}
+.app-shell .image-processing.generation-idle .canvas-notice-heading{min-width:0;align-items:flex-start}
+.app-shell .image-processing.generation-idle .canvas-notice-heading strong{color:var(--ui-ink)!important;font-size:14px!important;line-height:1.5;text-align:left;font-weight:650!important}
+.app-shell .image-processing.generation-idle .processing-status>strong[hidden]{display:none!important}
+.app-shell .image-processing.generation-idle .canvas-task-notice p{margin:7px 0;font-size:12px;text-shadow:none}
+.app-shell .image-processing.generation-idle .processing-status{max-height:calc(100% - 62px);scrollbar-width:thin}
+
+/* Compact, bottom-aligned notices leave the subject visible at canvas scale. */
+.canvas-task-notice{padding:12px 14px;border-radius:12px;box-shadow:0 3px 12px #00000012}
+.canvas-task-notice .canvas-notice-heading strong{font-size:13px;font-weight:650}
+.canvas-task-notice p{margin:5px 0 8px;line-height:1.5}
+.canvas-task-notice>p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.canvas-notice-footer{display:flex;align-items:flex-start;gap:12px;font-size:11px}
+.canvas-task-notice summary{color:var(--ui-secondary);font-size:11px;padding:2px 0}
+.canvas-notice-action{flex-shrink:0}
+.app-shell .canvas-task-notice .canvas-notice-action button{border:0;background:transparent;color:var(--ui-ink);box-shadow:none;padding:2px 0;font:inherit;cursor:pointer}
+.app-shell .canvas-task-notice .canvas-notice-action button:hover,.canvas-task-notice summary:hover{color:var(--ui-accent)}
+.canvas-notice-action button:focus-visible,.canvas-task-notice summary:focus-visible{outline:2px solid var(--ui-accent);outline-offset:3px;border-radius:3px}
+.app-shell .image-processing.generation-idle .processing-status{top:auto;bottom:12px;transform:translateX(-50%);width:calc(100% - 24px);max-width:280px;max-height:calc(100% - 24px);border-radius:12px}
+.app-shell .image-processing.generation-idle .canvas-notice-heading strong{font-size:13px!important}
+.app-shell .image-processing.generation-idle .canvas-task-notice p{margin:5px 0 8px}
+
+.group-action-menu{position:relative}
+.group-action-options{position:absolute;right:0;top:calc(100% + 10px);width:264px;padding:8px;border:1px solid var(--ui-border);border-radius:18px;background:var(--ui-panel);box-shadow:var(--ui-shadow);z-index:60}
+.app-shell .selection-tools .group-action-options button{width:100%;justify-content:flex-start;padding:12px;gap:12px;text-align:left}
+.group-action-options span{display:flex;flex-direction:column;gap:5px}
+.group-action-options small{font-size:11px;font-weight:400;color:var(--ui-secondary)}
+.app-shell .selection-tools .group-action-options{display:flex;flex-direction:column;align-items:stretch;gap:2px}.app-shell .selection-tools .group-action-options button{flex-shrink:0;white-space:normal}
+
+/* Compact composer: retain readable text and controls, remove stacked empty space. */
+.app-shell .creation-dock:not(.minimized){padding:12px 16px 10px}
+.app-shell .creation-dock:not(.minimized) .dock-heading{margin-bottom:8px;gap:12px}
+.app-shell .creation-dock .composer-reference-tray{padding:5px 8px;margin-bottom:6px;gap:10px;border-radius:10px}
+.app-shell .creation-dock .composer-reference-tray .reference-strip{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;max-height:52px;padding:2px 0}
+.app-shell .creation-dock .composer-reference-tray .reference-strip>span[draggable]{width:48px;min-width:48px;height:44px;padding:0}
+.app-shell .creation-dock:not(.minimized) .composer-reference-tray .reference-strip img{width:46px;height:42px;object-fit:cover}
+.app-shell .creation-dock .composer-reference-tray .reference-strip>span>button:not(:last-child){top:18px;height:22px}
+.app-shell .creation-dock .dock-workspace{gap:6px}
+.app-shell .creation-dock .creation-modes button{min-height:28px;padding-top:4px;padding-bottom:4px}
+.app-shell .creation-dock:not(.minimized) .creation-input{padding:10px 12px;border-radius:12px}
+.app-shell .creation-dock:not(.minimized) .creation-input textarea{height:52px;min-height:52px;max-height:124px;font-size:15px;line-height:1.7;overflow-y:auto;resize:vertical}
+@supports(field-sizing:content){.app-shell .creation-dock:not(.minimized) .creation-input textarea{field-sizing:content;height:auto}}
+.app-shell .creation-dock .dock-footer{margin-top:8px;gap:10px}
+.app-shell .creation-dock .dock-status{margin-top:5px;line-height:1.4}
+@media(max-width:600px){
+ .app-shell .creation-dock:not(.minimized){padding:10px 12px}
+ .app-shell .creation-dock .dock-heading .composer-mode-tabs{flex-basis:auto;order:initial}
+ .app-shell .creation-dock .dock-heading{flex-wrap:wrap;gap:6px}
+}

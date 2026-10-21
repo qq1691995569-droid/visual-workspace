@@ -1,8 +1,13 @@
 import {readFile} from 'node:fs/promises'
 import {createHash} from 'node:crypto'
-const processors={'white-background':'white',edit:'image',redraw:'image',background:'local-cutout',erase:'local-vision',upscale:'local-vision',expand:'expand',separate:'qwen-layered'}
+const processors={'white-background':'white',edit:'image',redraw:'image',background:'local-cutout',erase:'local-vision',upscale:'local-vision',expand:'expand',separate:'interior-separate'}
 export async function canvasSkill(operation, root=new URL('./skills/',import.meta.url)) {
   if(!Object.hasOwn(processors,operation))throw Error('未知画布技能')
+  if(operation==='separate'){
+    const source=await readFile(new URL('interior-scene-separate/SKILL.md',root),'utf8')
+    const contract=await readFile(new URL('interior-scene-separate/references/plan-contract.md',root),'utf8')
+    return {operation,name:'室内场景分层',version:2,processor:'interior-separate',model:'doubao-seedream-5-0-pro-260628',prompt:source+'\n'+contract,hash:createHash('sha256').update(source+contract).digest('hex')}
+  }
   const source=await readFile(new URL(`canvas-${operation}/SKILL.md`,root),'utf8')
   const match=source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]+)$/)
   if(!match)throw Error('技能文件格式无效')

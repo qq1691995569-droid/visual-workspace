@@ -41,7 +41,7 @@ export function toolPlacement(sourceId:string|undefined,nodes:Node[],at:{x:numbe
  return {x:origin.x+(Number(source.style?.width)||source.measured?.width||340)+110,y:origin.y}
 }
 
-// Lay out only the selected workflow. Result batches share a compact four-column row.
+// Lay out the selected dependency graph in columns with branch-aware ordering.
 export function arrangeWorkflow<N extends Node>(nodes:N[],edges:{source:string;target:string}[]):N[]{
  const selected=new Set(nodes.filter(n=>n.selected&&!n.hidden).map(n=>n.id))
  const chosen=nodes.filter(n=>{if(!selected.has(n.id))return false;let parent=n.parentId;const seen=new Set<string>();while(parent&&!seen.has(parent)){if(selected.has(parent))return false;seen.add(parent);parent=nodes.find(p=>p.id===parent)?.parentId}return true})
@@ -64,21 +64,45 @@ export function arrangeWorkflow<N extends Node>(nodes:N[],edges:{source:string;t
    const id=(ready.length?ready:[...pending].sort(compare))[0]
    rank.set(id,Math.max(0,...[...incoming.get(id)!].filter(p=>rank.has(p)).map(p=>rank.get(p)!+1)));pending.delete(id)
   }
-  let x=left,componentHeight=0
-  for(let level=0;level<=Math.max(...rank.values());level++){
-   const layer=component.filter(id=>rank.get(id)===level).sort(compare),batches=new Map<string,string[]>()
-   for(const id of layer){const n=byId.get(id)!,result=(n.data.skillResult||n.data.pendingResult) as {jobId?:string;sourceNode?:string}|undefined;const key=n.data.kind==='image'&&incoming.get(id)!.size?`${[...incoming.get(id)!].sort().join(',')}:${result?.jobId||''}`:id;batches.set(key,[...(batches.get(key)||[]),id])}
-   let y=top,layerWidth=0
-   for(const batch of batches.values()){
-    for(let start=0;start<batch.length;start+=4){const row=batch.slice(start,start+4);let cursor=x,rowHeight=0
-     for(const id of row){const dimensions=size(byId.get(id)!);places.set(id,{x:cursor,y});cursor+=dimensions.w+36;rowHeight=Math.max(rowHeight,dimensions.h)}
-     layerWidth=Math.max(layerWidth,cursor-x-36);y+=rowHeight+36
-    }
-    y+=28
+  const layers=Array.from({length:Math.max(...rank.values())+1},(_,level)=>component.filter(id=>rank.get(id)===level).sort(compare))
+  const order=new Map<string,number>()
+  const refresh=()=>layers.forEach(layer=>layer.forEach((id,i)=>order.set(id,i)))
+  // Barycentric sweeps bring connected branches together instead of sorting by
+  // the old arbitrary screen coordinates. Backward cycle edges remain unchanged.
+  refresh()
+  for(let pass=0;pass<6;pass++){
+   const forward=pass%2===1,indices=layers.map((_,i)=>i)
+   if(!forward)indices.reverse()
+   for(const level of indices){
+    const neighbours=forward?incoming:outgoing
+    const score=(id:string)=>{const peers=[...neighbours.get(id)!].filter(p=>rank.get(p)!==level && (forward?rank.get(p)!<level:rank.get(p)!>level));return peers.length?peers.reduce((sum,p)=>sum+order.get(p)!,0)/peers.length:order.get(id)!}
+    layers[level].sort((a,b)=>score(a)-score(b)||order.get(a)!-order.get(b)!||a.localeCompare(b));refresh()
    }
-   componentHeight=Math.max(componentHeight,y-top-64);x+=layerWidth+120
   }
-  top+=componentHeight+100
+  const gapY=64,gapX=160,centers=new Map<string,number>()
+  const heights=layers.map(layer=>layer.reduce((sum,id)=>sum+size(byId.get(id)!).h,0)+Math.max(0,layer.length-1)*gapY)
+  const maxHeight=Math.max(...heights)
+  layers.forEach((layer,l)=>{let y=(maxHeight-heights[l])/2;for(const id of layer){const h=size(byId.get(id)!).h;centers.set(id,y+h/2);y+=h+gapY}})
+  // Center parents on their children and chains on their inputs, while packing
+  // each column with actual node heights so labels and large tools do not overlap.
+  for(let pass=0;pass<8;pass++){
+   const forward=pass%2===0,indices=layers.map((_,i)=>i);if(!forward)indices.reverse()
+   for(const l of indices){
+    const layer=layers[l],neighbours=forward?incoming:outgoing
+    const desired=layer.map(id=>{const peers=[...neighbours.get(id)!].filter(p=>forward?rank.get(p)!<l:rank.get(p)!>l);return peers.length?peers.reduce((sum,p)=>sum+centers.get(p)!,0)/peers.length:centers.get(id)!})
+    const packed:number[]=[]
+    layer.forEach((id,i)=>{const h=size(byId.get(id)!).h;packed.push(Math.max(desired[i],i?packed[i-1]+size(byId.get(layer[i-1])!).h/2+h/2+gapY:-Infinity))})
+    const shift=packed.reduce((sum,y,i)=>sum+y-desired[i],0)/Math.max(1,layer.length)
+    layer.forEach((id,i)=>centers.set(id,packed[i]-shift))
+   }
+  }
+  const minY=Math.min(...component.map(id=>centers.get(id)!-size(byId.get(id)!).h/2))
+  let x=left,componentHeight=0
+  for(const layer of layers){
+   for(const id of layer){const {h}=size(byId.get(id)!);const y=centers.get(id)!-h/2-minY;places.set(id,{x,y:top+y});componentHeight=Math.max(componentHeight,y+h)}
+   x+=Math.max(...layer.map(id=>size(byId.get(id)!).w))+gapX
+  }
+  top+=componentHeight+160
  }
  return fitGroupNodes(nodes.map(n=>{const p=places.get(n.id);if(!p)return n;const parent=n.parentId?absolutePosition(n.parentId,nodes):{x:0,y:0};return {...n,position:{x:p.x-parent.x,y:p.y-parent.y}}}))
 }

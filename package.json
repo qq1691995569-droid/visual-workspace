@@ -11,6 +11,7 @@
     "test": "playwright test"
   },
   "dependencies": {
+    "@figit/fig-kiwi": "0.2.0",
     "@xyflow/react": "^12.12.0",
     "idb-keyval": "^6.3.0",
     "lucide-react": "^1.59.0",

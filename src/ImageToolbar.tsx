@@ -8,9 +8,10 @@ export function ImageToolbar({ anchor, revision, onAction, onDownload, onSaveAss
   onAction: (operation: string) => void; onDownload: () => void; onSaveAsset?:()=>void; assetSaved?:boolean; onCompare?:()=>void
 }) {
   const zoom=useStore(state=>state.transform[2])
-  const scale=Math.max(.95,Math.min(1,zoom))
+  const scale=Math.max(.15,Math.min(1,zoom))
+  const dragging=useStore(state=>state.nodes.some(node=>node.dragging))
   const toolbar = useRef<HTMLDivElement>(null)
-  const [position, setPosition] = useState<{ left: number; top: number } | null>(null)
+  const [position, setPosition] = useState<{ left: number; top: number; scale: number } | null>(null)
   useLayoutEffect(() => {
     const update = () => {
       const rect = anchor.current?.getBoundingClientRect()
@@ -18,11 +19,11 @@ export function ImageToolbar({ anchor, revision, onAction, onDownload, onSaveAss
       const canvas = anchor.current?.closest('main')?.getBoundingClientRect()
       const leftBound = canvas ? canvas.left + 12 : 12
       const rightBound = canvas ? canvas.right - 12 : window.innerWidth - 12
-      toolbar.current.style.maxWidth = `${Math.max(160,(rightBound-leftBound)/scale)}px`
-      const width = toolbar.current.offsetWidth*scale, height = toolbar.current.offsetHeight*scale
-      const above = rect.y - height - 10
-      const top = above >= 80 ? above : rect.bottom + 10
-      setPosition({ left: Math.max(leftBound, Math.min(rect.x + rect.width / 2 - width / 2, rightBound - width)), top:Math.min(top,window.innerHeight-height-12) })
+      const displayScale = Math.min(scale, Math.max(0, rightBound-leftBound) / toolbar.current.offsetWidth)
+      const width = toolbar.current.offsetWidth * displayScale
+      const left = Math.max(leftBound, Math.min(rect.left + rect.width / 2 - width / 2, rightBound-width))
+      const top = rect.top - toolbar.current.offsetHeight * displayScale - 6
+      setPosition({ left, top, scale: displayScale })
     }
     update()
     const observer = new ResizeObserver(update)
@@ -43,11 +44,14 @@ export function ImageToolbar({ anchor, revision, onAction, onDownload, onSaveAss
     { id: 'expand', label: '扩图', icon: Expand },
     { id: 'upscale', label: '变清晰', icon: ScanLine },
   ]
-  return createPortal(<div ref={toolbar} role="toolbar" aria-label="图片快捷修改" className="image-toolbar image-edit-toolbar small-image-toolbar" style={{ left: position?.left || 12, top: position?.top || 80, transform:`scale(${scale})`,transformOrigin:'top left',visibility: position ? 'visible' : 'hidden' }} onPointerDown={e => e.stopPropagation()}>
-    {onCompare&&<button title="滑块对比" onClick={onCompare}><Columns2 size={14}/><span>滑块对比</span></button>}
-    {onSaveAsset&&<button disabled={assetSaved} onClick={onSaveAsset}><Archive size={14}/><span>{assetSaved?'已入库':'保存资产'}</span></button>}
-    {actions.map((action,index)=><button key={action.id} className={index===2?'with-divider':''} title={action.label} onClick={()=>onAction(action.id)}><action.icon size={14}/><span>{action.label}</span></button>)}
-    <button className="with-divider" aria-label="下载原图" title="下载原图" onClick={onDownload}><Download size={15}/></button>
-
+  const commands = [
+    ...(onCompare ? [{ id: 'compare', label: '滑块对比', icon: Columns2, run: onCompare }] : []),
+    ...actions.map(action => ({...action, run: () => onAction(action.id)})),
+    ...(onSaveAsset ? [{ id: 'save', label: assetSaved ? '已入库' : '保存资产', icon: Archive, run: onSaveAsset, disabled: assetSaved }] : []),
+    { id: 'download', label: '下载原图', icon: Download, run: onDownload },
+  ]
+  const renderButton = (command: typeof commands[number]) => <button key={command.id} title={command.label} aria-label={command.label} disabled={'disabled' in command && command.disabled} onClick={command.run}><command.icon size={16}/><span>{command.label}</span></button>
+  return createPortal(<div ref={toolbar} role="toolbar" aria-label="图片快捷修改" className={`image-toolbar image-edit-toolbar single-row-image-toolbar`} style={{ left: position?.left ?? 12, top: position?.top ?? 80, transform:`scale(${position?.scale ?? scale})`,transformOrigin:'top left',visibility: position && position.scale > 0 && position.top >= 68 && !dragging ? 'visible' : 'hidden' }} onPointerDown={e => e.stopPropagation()}>
+    <div className="image-toolbar-row">{commands.map(renderButton)}</div>
   </div>, document.body)
 }

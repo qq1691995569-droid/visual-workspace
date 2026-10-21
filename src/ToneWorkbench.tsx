@@ -45,6 +45,16 @@ export function ToneWorkbench({ target, initialReference, initialParameters, onC
     window.addEventListener('message', receive)
     return () => { active = false; window.removeEventListener('message', receive) }
   }, [session])
+  useEffect(() => {
+    const sync = () => {
+      const doc = frame.current?.contentDocument
+      if (doc) doc.documentElement.style.colorScheme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
+    }
+    sync()
+    const observer = new MutationObserver(sync)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+    return () => observer.disconnect()
+  }, [ready, previewReady])
   async function sendImage(picture: Picture, key: 'target' | 'reference', signal?: AbortSignal) {
     try {
       const response = await fetch(picture.src, { signal })

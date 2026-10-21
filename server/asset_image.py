@@ -14,6 +14,17 @@ def encoded(image):
 body=json.load(sys.stdin)
 base=load(body['base']); w,h=base.size
 if w*h>40_000_000: raise ValueError('image too large')
+if body['action']=='separation_output':
+    result=ImageOps.exif_transpose(Image.open(io.BytesIO(base64.b64decode(body['result'].split(',',1)[1])))).convert('RGBA')
+    if abs(result.width/result.height-w/h)/(w/h)>.015: raise ValueError('Layer aspect changed')
+    result=result.resize((w,h),Image.Resampling.LANCZOS)
+    if body.get('transparent'):
+        a=result.getchannel('A'); hist=a.histogram(); total=w*h
+        if sum(hist[:16])/total<.01 or sum(hist[128:])/total<.0001: raise ValueError('No usable alpha')
+        box=a.point(lambda v:255 if v>32 else 0).getbbox(); expected=body['bbox']
+        cx=(box[0]+box[2])/2/w; cy=(box[1]+box[3])/2/h
+        if abs(cx-expected['x']-expected['width']/2)>.15 or abs(cy-expected['y']-expected['height']/2)>.15: raise ValueError('Layer position changed')
+    json.dump({'image':encoded(result),'width':w,'height':h},sys.stdout);sys.exit(0)
 if body['action']=='inspect':
     json.dump({'width':w,'height':h},sys.stdout)
     sys.exit(0)

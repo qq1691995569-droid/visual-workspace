@@ -1,3 +1,4 @@
+import { CanvasSelect } from './CanvasSelect'
 import {useEffect,useState} from 'react'
 import {Plus,Search,X,MoreHorizontal,Image as ImageIcon,ArrowLeft,FolderOpen,Trash2} from 'lucide-react'
 import {canvasProjects} from './canvasStorage'
@@ -16,7 +17,7 @@ export function ProjectManager({onClose,onCreate,onImport,onOpen,onBackup,onDele
    <section className="pm-hero"><div><span className="pm-eyebrow">YOUR CREATIVE SPACE</span><h1>画布项目</h1><p>让每一次创作，都有自己的空间。</p><div className="pm-stats">{total.length} 个项目<span>·</span>{total.reduce((sum,p)=>sum+p.count,0)} 张图片<span>·</span>保存在当前浏览器</div></div><button className="pm-primary" disabled={busy} onClick={()=>void run(onCreate)}><Plus size={19}/>新建画布</button></section>
    <section className="pm-library">
     <div className="pm-library-heading"><div><h2>{trash?'回收站':'我的项目'}</h2><p>{trash?'删除的项目保留在这里，可随时恢复。':'从上次停下的地方，继续创作。'}</p></div><button onClick={()=>{setTrash(!trash);setMenu(null)}}><Trash2 size={15}/>{trash?'返回项目':'回收站'}</button></div>
-    <div className="pm-tools"><label><Search size={17}/><input aria-label="搜索项目" placeholder="搜索项目名称" value={query} onChange={e=>setQuery(e.target.value)}/></label><select aria-label="项目排序" value={sort} onChange={e=>setSort(e.target.value)}><option value="updated">最近更新</option><option value="name">项目名称</option></select><button disabled={busy} onClick={onImport}><FolderOpen size={15}/>导入项目</button></div>
+    <div className="pm-tools"><label><Search size={17}/><input aria-label="搜索项目" placeholder="搜索项目名称" value={query} onChange={e=>setQuery(e.target.value)}/></label><CanvasSelect aria-label="项目排序" value={sort} onChange={e=>setSort(e.target.value)}><option value="updated">最近更新</option><option value="name">项目名称</option></CanvasSelect><button disabled={busy} onClick={onImport}><FolderOpen size={15}/>导入项目</button></div>
     {error&&<div className="pm-error" role="alert">{error}</div>}
     <div className="pm-grid">
      {!trash&&!query&&<button className="pm-create-tile" disabled={busy} onClick={()=>void run(onCreate)}><span><Plus size={28}/></span><strong>开启新的画布</strong><small>自由构思，从这里开始</small></button>}

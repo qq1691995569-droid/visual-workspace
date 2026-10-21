@@ -18,3 +18,5 @@
 <div id="previewSource" hidden><button id="export" disabled>导出原尺寸 PNG</button><button id="params" disabled>保存参数</button><span id="dimensions">预览长边最多 1200 px，导出使用原始尺寸。建议使用 sRGB 图片。</span><canvas id="output"></canvas><canvas id="before"></canvas><input id="compare" type="range" min="0" max="100" value="50"></div>
 <dialog id="previewDialog" aria-labelledby="previewTitle"><div class="resulthead"><h2 id="previewTitle">效果预览</h2><button id="closePreview">关闭预览</button></div><div id="dialogContent"></div></dialog></main>
 <link rel="stylesheet" href="/comparison-handle.css"><link rel="stylesheet" href="canvas-preview.css"><script src="color.js"></script><script src="app.js"></script><script src="preview.js"></script><script src="bridge.js"></script></html>
+
+<script type="module">if(document.documentElement.classList.contains("canvas-preview"))import("./select-menu.js")</script>

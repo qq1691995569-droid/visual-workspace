@@ -15,7 +15,8 @@ test('收拢组不会被远处子节点撑开，修复旧尺寸且保留展开�
   assert.equal(folded[0].data.expandedSize, original)
   assert.equal(fitGroupNodes(folded), folded)
   const expanded = fitGroupNodes([{ ...folded[0], style: original, data: { ...folded[0].data, collapsed: false } }, folded[1]])
-  assert.equal(expanded[0].style.width, 2378)
+  assert.equal(expanded[0].style.width, 956)
+  assert.deepEqual(absolutePosition('photo',expanded),{x:1450,y:700})
 })
 
 test('生成结果靠近所属节点，局部避让，不受远方图片影响', () => {
@@ -59,4 +60,28 @@ test('分组边界覆盖节点及标题空间，禁止嵌套或重复分组', ()
 })
 test('分组层级异常不会进入无限循环', () => {
   assert.throws(() => absolutePosition('a', [{ ...nodes[0], parentId: 'b' }, { ...nodes[1], parentId: 'a' }]))
+})
+
+test('分组向内收紧四边，子节点世界位置不变，重复计算稳定',()=>{
+ const ns=[{id:'g',position:{x:100,y:200},style:{width:3000,height:2000},data:{kind:'group'}},
+ {id:'a',parentId:'g',position:{x:500,y:400},measured:{width:100,height:100},data:{}},
+ {id:'b',parentId:'g',position:{x:700,y:600},measured:{width:100,height:100},data:{}}]
+ const before=ns.slice(1).map(n=>absolutePosition(n.id,ns))
+ const out=fitGroupNodes(ns)
+ assert.deepEqual(out[0].position,{x:572,y:536})
+ assert.equal(out[0].width,356);assert.equal(out[0].height,392)
+ assert.deepEqual(out.slice(1).map(n=>absolutePosition(n.id,out)),before)
+ assert.equal(fitGroupNodes(out),out)
+ const moved=out.map(n=>n.id==='b'?{...n,position:{x:150,y:150}}:n)
+ const shrunk=fitGroupNodes(moved)
+ assert.ok(shrunk[0].width<out[0].width);assert.ok(shrunk[0].height<out[0].height)
+})
+test('向左上扩展分组保留世界位置，拖动过程中不重设坐标原点',()=>{
+ const ns=[{id:'g',position:{x:100,y:200},style:{width:300,height:200},data:{kind:'group'}},
+ {id:'a',parentId:'g',position:{x:-100,y:-80},measured:{width:100,height:100},data:{}}]
+ const out=fitGroupNodes(ns)
+ assert.deepEqual(out[0].position,{x:-28,y:56})
+ assert.deepEqual(absolutePosition('a',out),{x:0,y:120})
+ const dragging=ns.map(n=>n.id==='a'?{...n,dragging:true}:n)
+ assert.equal(fitGroupNodes(dragging),dragging)
 })

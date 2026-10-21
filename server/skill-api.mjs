@@ -1,3 +1,4 @@
+import {separationRunner} from './interior-separate.mjs'
 import {resolveSkillRatio} from './skill-ratio.mjs'
 import {localCutout} from './local-cutout.mjs'
 import {localVision,localProcessors} from './local-vision.mjs'
@@ -155,8 +156,10 @@ async function whiteBackgroundResult(job, source) {
   await save(job)
   return null
 }
+const syncSeparation=separationRunner({active,save,load,vision,imageRequest,submitImage,syncJob,cutout:localCutout,imageTool:assetImageTool,capabilities:()=>dreo('GET','/capabilities'),deleted:id=>deletedJobs.has(id)})
 async function syncJob(job) {
   if(job.deletedAt||deletedJobs.has(job.id))return {...job,status:"paused",message:"任务已删除",images:[]}
+  if(job.separation)return syncSeparation(job)
   if (!job.taskId || active.has(job.id) || job.status==='paused' || job.status==='complete' && (!(job.personAsset||job.assetCandidate) || job.asset || job.assetDraft)) return job
   active.add(job.id)
   try {
@@ -165,10 +168,13 @@ async function syncJob(job) {
     job.remoteStatus = task.status
     job.queryFailures = 0; job.lastCheckedAt = new Date().toISOString(); delete job.warning
     const images = task.images?.length ? task.images : (task.result?.image_urls || []).map(url => ({ url }))
+    delete job.processingFailed
     for (const [index, image] of images.entries()) {
       if (!image.url || job.images.some(item => item.index === index)) continue
+      let resultStage='download'
       try {
         let src = job.whiteBackground?.original || await downloadImage(image.url)
+        resultStage='processing'
         if(job.whiteBackground){const clean=await whiteBackgroundResult(job,src);if(!clean)return job;src=clean}
         if(job.canvasSkill && ['matte','white','restore','layers'].includes(job.canvasSkill.processor)){
           const processed=await assetImageTool({action:job.canvasSkill.processor,base:job.canvasBase,result:src})
@@ -179,10 +185,17 @@ async function syncJob(job) {
         if (job.localEdit && job.localEdit.spatialGuidance!=='object-outline') src = (await assetImageTool({action:'composite',base:job.localEdit.base,coordinateSpace:job.localEdit.coordinateSpace,points:job.localEdit.points,strokes:job.localEdit.strokes,regions:job.localEdit.regions,result:src})).image
         job.images.push({ index, src, review: { geometry: '待人工复核', product: '待人工复核', material: '待人工复核', lighting: '待人工复核', ...(job.localEdit ? { protection:job.localEdit.spatialGuidance==='object-outline'?'使用目标轮廓定位，保留模型原始结果；对象边界、遮挡及非目标区域需复核':'已将选区外像素恢复为输入原图；选区内构图与细节需滑块复核' } : {}) } }); await save(job)
       }
-      catch { job.warning = '图片下载或结果合成未通过校验，已保留任务，可重新查询；不会重新生图';if(job.canvasSkill||job.whiteBackground)job.processingFailed=true }
+      catch (error) {
+        const raw = String(error?.message || '')
+        const alignment = raw.startsWith('扩图结果改变了原图位置或内容')
+        const reason = alignment ? '扩图结果改变了原图位置或内容，为避免重影和接缝，已停止合成。' : resultStage==='download' ? '生成结果下载失败，尚未保存到画布。' : raw==='局部图像处理运行时不可用' ? raw : '本地图像处理未通过检查，请核对图片格式、尺寸和处理范围。'
+        job.resultFailure={stage:resultStage,code:alignment?'EXPANSION_ALIGNMENT':resultStage==='download'?'RESULT_DOWNLOAD':'RESULT_PROCESSING',message:reason,index,at:new Date().toISOString()}
+        job.warning = reason + ' 原任务已保留，不会自动重新生图。'
+        if(job.canvasSkill||job.whiteBackground)job.processingFailed=true
+      }
     }
     if (['success','succeeded','completed'].includes(task.status)) {
-      if(job.processingFailed){job.status='paused';job.message='结果未通过合成校验，未发布到画布；请核对模型输出和对应技能规则'}
+      if(job.processingFailed){job.status='paused';job.message=job.resultFailure?.message || '结果处理未完成，原图已保留'}
       else if (job.images.length < (job.options?.count || 4)) { job.status = images.length >= (job.options?.count || 4) && Date.now() - Date.parse(job.createdAt) < 3600000 ? 'download_pending' : 'paused'; job.message = `任务结束，已保存 ${job.images.length}/${job.options?.count || 4} 张，${job.status === 'download_pending' ? '等待补全下载' : '请人工检查缺失结果'}` }
       else { job.status = 'complete'; job.message = `已保存 ${job.images.length} 张结果，等待复核` }
       if (job.feature !== 'image' && visionConfigured() && job.status === 'complete') for (const image of job.images) {
@@ -273,7 +286,7 @@ async function executeSkill(job, body, routes) {
   } catch (error) { await submissionFailure(job, error, false) }
   finally { active.delete(job.id) }
 }
-function publicJob(job) { return { id: job.id, createdAt: job.createdAt, finishedAt: job.finishedAt, serverNow: new Date().toISOString(), status: job.status, message: /EPERM|EACCES|EBUSY|operation not permitted/.test(job.message || '') ? '本地任务记录保存失败，请核对任务状态；不会自动重复生图' : job.message, taskId: job.taskId, warning: job.warning, phase:job.phase, resolvedRegions:job.resolvedRegions, images: job.images, asset:job.asset, ratio: job.ratio, skillVersion: job.canvasSkill?.version || job.rules?.version || 1, skillHash:job.canvasSkill?.hash, adjustments: job.plan?.adjustments || [] } }
+function publicJob(job) { return { id: job.id, createdAt: job.createdAt, finishedAt: job.finishedAt, serverNow: new Date().toISOString(), status: job.status, message: /EPERM|EACCES|EBUSY|operation not permitted/.test(job.message || '') ? '本地任务记录保存失败，请核对任务状态；不会自动重复生图' : job.message, taskId: job.taskId, warning: job.warning, phase:job.phase, resolvedRegions:job.resolvedRegions, separationPlan:job.separation?.plan, images: job.images, asset:job.asset, ratio: job.ratio, skillVersion: job.canvasSkill?.version || job.rules?.version || 1, skillHash:job.canvasSkill?.hash, adjustments: job.plan?.adjustments || [] } }
 function monitor(id) {
   if (deletedJobs.has(id)||monitors.has(id)) return
   const timer = setTimeout(async () => {
@@ -437,6 +450,20 @@ async function handle(method, url, body) {
     const fingerprint=createHash('sha256').update(JSON.stringify({operation:body.operation,base:body.base,parameters,options:body.options})).digest('hex')
     let prior;try{prior=await load(body.requestId)}catch(error){if(error.code!=='ENOENT')throw error}
     if(prior){if(prior.fingerprint!==fingerprint)throw Error('请求 ID 已用于另一组操作');return publicJob(prior)}
+    if(skill.processor==='interior-separate'){
+      if(!visionConfigured())throw Error('请先配置视觉分析接口，再使用室内场景分层')
+      await localCutout(null) // Verify the alpha runtime before any paid generation.
+      const caps=await dreo('GET','/capabilities'),meta=await assetImageTool({action:'inspect',base:body.base})
+      const route=caps.routes?.['conversation-image']?.available_routes?.find(r=>r.model===skill.model)
+      if(!route)throw Error('后台尚未开放 Seedream 5.0 Pro 分层模型')
+      const ratio=ratioFor(meta.width,meta.height)
+      const options={model:skill.model,ratio,resolution:route.supported_resolutions?.includes('2K')?'2K':route.supported_resolutions?.[0],count:1}
+      imageRequest({mode:'redraw',images:[body.base],prompt:'分层预检',options},caps)
+      const job={id:body.requestId,type:'generation',feature:'image',canvasSkill:skill,fingerprint,options,status:'analyzing',message:'正在准备室内场景分层',images:[],createdAt:new Date().toISOString(),separation:{base:body.base,supplement:parameters.prompt||'',source:meta}}
+      await mkdir(store,{recursive:true})
+      try{await writeFile(idPath(job.id),JSON.stringify(job),{flag:'wx'})}catch(error){if(error.code!=='EEXIST')throw error;return publicJob(await load(job.id))}
+      void syncSeparation(job).then(()=>monitor(job.id));return publicJob(job)
+    }
     if(localProcessors.includes(skill.processor)){
       const job={id:body.requestId,type:'generation',feature:'image',canvasSkill:skill,fingerprint,options:{count:1},status:'queued',message:'本地处理已排队',images:[],createdAt:new Date().toISOString()}
       await mkdir(store,{recursive:true})
@@ -576,7 +603,7 @@ async function handle(method, url, body) {
   if (method === 'GET' && /^\/api\/skills\/(style|images)\/tasks\/[a-f0-9-]{36}$/.test(url)) {
     let job;try{job=await load(url.split('/').pop())}catch(error){if(error.code==='ENOENT')throw Object.assign(Error('此任务的本地记录不存在'),{code:'TASK_NOT_FOUND'});throw error} if (job.type !== 'generation') throw Error('不是生成任务')
     if(!active.has(job.id)&&!job.taskId&&['locating','composing'].includes(job.status)){job.status='paused';job.message='后台识别或组合被服务重启中断，尚未提交生图；请重新生成';await save(job)}
-    if (!active.has(job.id) && !job.taskId && ['preparing','analyzing','queued','uploading','submitting'].includes(job.status)) { job.status = 'submission_unknown'; job.message = '本地进程曾中断，请在 DREO 核对后处理；不会自动重新提交'; await save(job) }
+    if (!job.separation && !active.has(job.id) && !job.taskId && ['preparing','analyzing','queued','uploading','submitting'].includes(job.status)) { job.status = 'submission_unknown'; job.message = '本地进程曾中断，请在 DREO 核对后处理；不会自动重新提交'; await save(job) }
     return publicJob(await syncJob(job))
   }
   throw Error('接口不存在')
@@ -584,7 +611,7 @@ async function handle(method, url, body) {
 export function skillApi() {
   return { name: 'local-canvas-skills', async configureServer(server) {
     visionSettings = await readVisionSettings()
-    void readdir(store).then(async files => { for (const file of files.filter(f => /^[a-f0-9-]{36}\.json$/.test(f))) { try { const job = await json(path.join(store,file));if(job.deletedAt){deletedJobs.add(job.id);continue} if(job.type==='asset-extraction'&&job.status==='analyzing'){job.status='paused';job.message='分析被服务重启中断，尚未提交预览生成，请重新提取';await save(job)} if(job.type==='generation'&&localProcessors.includes(job.canvasSkill?.processor)&&!['complete','paused'].includes(job.status)){job.status='paused';job.message='本地模型任务被服务重启中断，未自动重新提交；请核对原任务';await save(job)} if (job.type === 'generation' && job.taskId && (!['complete','paused'].includes(job.status)||job.status==='complete'&&(job.personAsset||job.assetCandidate)&&!job.asset&&!job.assetDraft)) monitor(job.id) } catch { /* Keep invalid records untouched. */ } } }).catch(() => {})
+    void readdir(store).then(async files => { for (const file of files.filter(f => /^[a-f0-9-]{36}\.json$/.test(f))) { try { const job = await json(path.join(store,file));if(job.deletedAt){deletedJobs.add(job.id);continue} if(job.type==='asset-extraction'&&job.status==='analyzing'){job.status='paused';job.message='分析被服务重启中断，尚未提交预览生成，请重新提取';await save(job)} if(job.type==='generation'&&localProcessors.includes(job.canvasSkill?.processor)&&!['complete','paused'].includes(job.status)){job.status='paused';job.message='本地模型任务被服务重启中断，未自动重新提交；请核对原任务';await save(job)} if(job.separation&&!['complete','paused','needs_attention'].includes(job.status))monitor(job.id); if (job.type === 'generation' && job.taskId && (!['complete','paused'].includes(job.status)||job.status==='complete'&&(job.personAsset||job.assetCandidate)&&!job.asset&&!job.assetDraft)) monitor(job.id) } catch { /* Keep invalid records untouched. */ } } }).catch(() => {})
     server.httpServer?.once('close', () => { for (const timer of monitors.values()) clearTimeout(timer); monitors.clear(); liveJobs.clear() })
     server.middlewares.use(async (req, res, next) => {
       if (!req.url?.startsWith('/api/skills/')) return next()

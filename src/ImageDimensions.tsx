@@ -23,8 +23,12 @@ export function ImageDimensions({src, previewSrc, dimensions}: {src: string; pre
     return () => { active = false; images.forEach(image => { image.onload = null; image.removeAttribute('src') }) }
   }, [src, previewSrc, known])
   const value = known || (loaded?.src === src ? loaded.value : undefined)
-  return <div className="image-dimensions" aria-label="图片像素尺寸">
-    <span>{previewSrc && <small>原图 </small>}{value || '读取尺寸…'}{value && <small> px</small>}</span>
-    {previewSrc && preview?.src === previewSrc && <span className="image-dimensions-preview">预览 {preview.value} px</span>}
+  const [w, h] = (value || '').split(' × ').map(Number)
+  const gcd = (a: number, b: number): number => b ? gcd(b, a % b) : a
+  const divisor = w && h ? gcd(w, h) : 1
+  const ratio = w && h ? `${w / divisor}:${h / divisor}` : ''
+  return <div className="image-dimensions" aria-label="图片尺寸和比例" title={previewSrc && preview?.src === previewSrc ? `预览 ${preview.value} px` : undefined}>
+    <span className="image-pixel-size">{value || '读取尺寸…'}{value && <small> px</small>}</span>
+    {ratio && <span className="image-aspect-ratio">{ratio}</span>}
   </div>
 }
