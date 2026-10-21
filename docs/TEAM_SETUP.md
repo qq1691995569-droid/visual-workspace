@@ -2,7 +2,7 @@
 
 仓库：https://github.com/qq1691995569-droid/visual-workspace
 
-这是私有仓库。仓库所有者先邀请同事的 GitHub 账号作为协作者，同事接受邀请后，用自己的账号拉取。无需共享所有者的账号或令牌。当前源码已直接更新到 main，请勿覆盖为旧 ZIP 快照。
+这是公开仓库，同事无需邀请即可查看和克隆源码。DREO 生图仍需各自的平台权限和个人令牌。当前源码已直接更新到 main，请勿覆盖为旧 ZIP 快照。
 
 ## 可直接复制给 AI 助手的接入提示词
 
@@ -10,7 +10,7 @@
 请帮我在这台电脑安装并启动 Visual Workspace 画板，仓库为：
 https://github.com/qq1691995569-droid/visual-workspace
 
-1. 我已获得这个私有仓库的访问权限。先检查 Git 登录和本地是否已有项目；未安装则克隆 main，已有则先保护本地改动，再安全拉取最新版本。直接使用源码，不解压仓库中的旧快照覆盖它。
+1. 这是公开仓库，无需 GitHub 登录即可克隆。先检查本地是否已有项目；未安装则克隆 main，已有则先保护本地改动，再安全拉取最新版本。直接使用源码，不解压仓库中的旧快照覆盖它。
 2. 阅读 README.md、docs/TEAM_SETUP.md、docs/CONTINUE_AT_HOME.md。检查 Git、Node.js（推荐 24 LTS）和 Python 3.11+。Windows 用 npm.cmd ci，创建 .venv，并用虚拟环境的 Python 安装 requirements.txt。
 3. 若 .env.local 不存在，从 .env.example 复制；已有配置不要覆盖。将 CANVAS_PYTHON 设置为本机虚拟环境 Python 的绝对路径。
 4. 帮我配置自己的 DREO 生图接口：先检查本机是否已有合法配置；没有时引导我在本地填写平台管理员提供的服务根地址和个人 Agent API token。默认文件为用户目录下 .dreo-visual-lab/credentials.json，字段为 origin 和 token；origin 不追加 /api/agent，token 不加 Bearer 前缀。也可通过 .env.local 的 CANVAS_DREO_CONFIG 指定配置文件绝对路径。不要让我把密钥发到聊天里，不输出或提交密钥，不使用 VITE_ 前缀保存密钥。

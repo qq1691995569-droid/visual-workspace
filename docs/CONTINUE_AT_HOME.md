@@ -2,7 +2,7 @@
 
 ## 1. 拉取与启动
 
-安装 Git、Node.js 22.12+（推荐 24 LTS）、Python 3.11+。仓库为私有，先在家里电脑登录同一个 GitHub 账号：
+安装 Git、Node.js 22.12+（推荐 24 LTS）、Python 3.11+。仓库已公开，拉取源码无需登录 GitHub：
 
 ```powershell
 git clone https://github.com/qq1691995569-droid/visual-workspace.git visual-workspace
