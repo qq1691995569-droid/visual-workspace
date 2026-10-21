@@ -1,3 +1,4 @@
+import {resolveSkillRatio} from './skill-ratio.mjs'
 import {localCutout} from './local-cutout.mjs'
 import {localVision,localProcessors} from './local-vision.mjs'
 import {canvasSkill,eraseSelection} from './canvas-skill.mjs'
@@ -255,8 +256,8 @@ async function executeSkill(job, body, routes) {
   active.add(job.id)
   try {
     const output = await preprocess(body.base), id = randomUUID()
-    let baseRatio
-    try { baseRatio = ratioFor(output.width, output.height) } catch (error) { if (body.options?.ratio && body.options.ratio !== 'auto') baseRatio = body.options.ratio; else throw error }
+    const resolvedRatio=resolveSkillRatio(body.options,routes,output.width,output.height)
+    const baseRatio=resolvedRatio.ratio;job.warning=resolvedRatio.warning
     job.options = runOptions(body.options, routes, baseRatio); job.ratio = job.options.ratio
     const prep = { id, type: 'preparation', base: body.base, ...output, ratio: baseRatio }; await save(prep)
     job.preparationId = id; job.status = 'analyzing'; job.message = '正在理解参考风格与补充要求'; await save(job)
@@ -392,7 +393,7 @@ async function handle(method, url, body) {
       await mkdir(store,{recursive:true})
       try{await writeFile(idPath(id),JSON.stringify(job),{flag:'wx'})}catch(error){if(error.code!=='EEXIST')throw error;const existing=await load(id);if(existing.fingerprint!==fingerprint)throw Error('请求 ID 冲突');return publicJob(existing)}
       active.add(id)
-      void prepareDeferredEdit(job,body,{save,inspect:async base=>{const meta=await assetImageTool({action:'inspect',base});return {...meta,ratio:ratioFor(meta.width,meta.height)}},capabilities:()=>dreo('GET','/capabilities'),validate:imageRequest,locate:async(kind,mark,hint)=>locatedObject(await vision(objectLocatePrompt(kind,mark,hint),[body.base]),mark),prepare:assetImageTool,submit:submitImage}).catch(error=>submissionFailure(job,error,false)).finally(()=>active.delete(id))
+      void prepareDeferredEdit(job,body,{save,inspect:async base=>{const meta=await assetImageTool({action:'inspect',base});return meta},capabilities:()=>dreo('GET','/capabilities'),validate:imageRequest,locate:async(kind,mark,hint)=>locatedObject(await vision(objectLocatePrompt(kind,mark,hint),[body.base]),mark),prepare:assetImageTool,submit:submitImage}).catch(error=>submissionFailure(job,error,false)).finally(()=>active.delete(id))
       return publicJob(job)
     }
     const plan=localEditPlan(body.edit)
@@ -400,10 +401,11 @@ async function handle(method, url, body) {
     let prior; try {prior=await load(id)} catch(error) {if(error.code!=='ENOENT') throw error}
     if(prior) {if(prior.fingerprint!==fingerprint) throw Error('请求 ID 已用于另一组局部修改'); return publicJob(prior)}
     const prepared=await assetImageTool({action:'prepare',base:body.base,points:body.edit.points,strokes:body.edit.strokes,regions:body.edit.regions?.map(r=>({...r,useImageReference:usesAssetReference(body.edit.kind,r)}))})
-    const ratio=ratioFor(prepared.width,prepared.height)
+    const resolvedRatio=resolveSkillRatio(body.options,(await dreo('GET','/capabilities')).routes?.['conversation-image']?.available_routes,prepared.width,prepared.height)
+    const ratio=resolvedRatio.ratio
     const input={mode:'redraw',prompt:JSON.stringify(plan),images:localEditImages(body.base,prepared,body.edit),options:{...body.options,ratio}}
     const request=imageRequest(input,await dreo('GET','/capabilities'))
-    const job={id,type:'generation',feature:'image',fingerprint,ratio,localEdit:{base:body.base,points:body.edit.points,strokes:body.edit.strokes,regions:body.edit.regions?.map(r=>({points:r.points,strokes:r.strokes}))},options:{...input.options},status:'queued',message:'局部编辑已排队，选区外将保留原图像素',images:[],createdAt:new Date().toISOString()}
+    const job={id,type:'generation',feature:'image',fingerprint,ratio,warning:resolvedRatio.warning,localEdit:{...(body.options?.ratio && body.options.ratio!=='auto'?{spatialGuidance:'object-outline'}:{}),base:body.base,points:body.edit.points,strokes:body.edit.strokes,regions:body.edit.regions?.map(r=>({points:r.points,strokes:r.strokes}))},options:{...input.options},status:'queued',message:'局部编辑已排队，选区外将保留原图像素',images:[],createdAt:new Date().toISOString()}
     await mkdir(store,{recursive:true})
     try {await writeFile(idPath(id),JSON.stringify(job),{flag:'wx'})} catch(error) {if(error.code!=='EEXIST') throw error; const existing=await load(id); if(existing.fingerprint!==fingerprint) throw Error('请求 ID 冲突'); return publicJob(existing)}
     void submitImage(job,input,request); return publicJob(job)
@@ -419,7 +421,9 @@ async function handle(method, url, body) {
     }
     const plan=lightingPlan(body.lighting,body.supplement,exteriorEvidence)
     const meta=await assetImageTool({action:'inspect',base:body.base})
-    body={requestId:body.requestId,mode:'redraw',images:[body.base],prompt:plan.prompt,options:{...body.options,ratio:ratioFor(meta.width,meta.height)},lightingPlan:plan}
+    const resolvedRatio=resolveSkillRatio(body.options,(await dreo('GET','/capabilities')).routes?.['conversation-image']?.available_routes,meta.width,meta.height)
+    if(resolvedRatio.warning)plan.adjustments.push(resolvedRatio.warning)
+    body={requestId:body.requestId,mode:'redraw',images:[body.base],prompt:plan.prompt,options:{...body.options,ratio:resolvedRatio.ratio},lightingPlan:plan}
   }
   if(method==='POST' && url==='/api/skills/canvas/tasks'){
     idPath(body.requestId)

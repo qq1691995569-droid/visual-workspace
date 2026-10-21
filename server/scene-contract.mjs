@@ -27,7 +27,7 @@ export function validatePlan(raw, protection, supplement = '') {
 }
 export function generationRequest(plan, keys, ratio, rules, options = {}) {
   if (!Array.isArray(keys) || keys.length !== 2 || !keys.every(k => typeof k === 'string' && k.length > 0) || keys[0] === keys[1]) throw Error('只允许灰度稿与线稿两个不同 storage_key')
-  if (!['1:1','4:3','3:4','16:9','9:16','3:2','2:3','4:5','5:4','21:9'].includes(ratio)) throw Error('底图比例不受指定模型支持，请先调整底图；不会自动裁切')
+  if (!['auto','1:1','4:3','3:4','16:9','9:16','3:2','2:3','4:5','5:4','21:9'].includes(ratio)) throw Error('底图比例不受指定模型支持，请先调整底图；不会自动裁切')
   const execution = plan.execution || { lighting: 'preserve', geometry: 'preserve', product: 'preserve' }
   return { tool_type: 'conversation-image', params: { prompt: JSON.stringify({ ...plan, skill: { id: rules.id, version: rules.version }, instructionPriority: 'user_supplement > builtin_defaults', constraints: plan.resolvedInstructions || rules.rules, ...execution, output: { ratio, resolution: options.resolution || '2K', count: options.count || 4, framing: '用户选择新比例时保留完整主体，不裁切产品；可向外延展背景' } }), route_override: { provider: options.provider || 'seedream', model: options.model || MODEL }, interactive: false, image_paths: keys, ratio, resolution: options.resolution || '2K', count: options.count || 4 } }
 }

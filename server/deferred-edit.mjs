@@ -1,3 +1,4 @@
+import {resolveSkillRatio} from './skill-ratio.mjs'
 import {cleanAsset,localEditPlan,localEditImages,usesAssetReference} from './canvas-assets.mjs'
 import {validMark} from './object-selection.mjs'
 export function deferredEdit(edit){
@@ -13,7 +14,8 @@ export async function prepareDeferredEdit(job,body,{save,inspect,capabilities,va
  const stage=async(step,message)=>{job.phase={step,total:4};job.status=step===1?'locating':'composing';job.message=message;await save(job)}
  await stage(1,`步骤 1/4 · 正在校验底图与参数，等待识别 ${total} 个对象`)
  const metadata=await inspect(body.base),caps=await capabilities()
- job.ratio=metadata.ratio
+ const resolvedRatio=resolveSkillRatio(body.options,caps.routes?.['conversation-image']?.available_routes,metadata.width,metadata.height)
+ job.ratio=resolvedRatio.ratio;job.warning=resolvedRatio.warning
  validate({mode:'redraw',prompt:'参数校验',images:Array(edit.regions.some(r=>usesAssetReference(edit.kind,r))?4:3).fill(body.base),options:{...body.options,ratio:job.ratio}},caps)
  let completed=0
  await stage(1,`步骤 1/4 · 后台识别对象范围（0/${total}）`)
@@ -27,9 +29,10 @@ export async function prepareDeferredEdit(job,body,{save,inspect,capabilities,va
  job.resolvedRegions=regions.map(r=>({id:r.id,target:r.name||r.target,points:r.points,polygons:r.polygons,exclusions:r.exclusions,mark:r.mark,confidence:r.confidence,notes:r.notes}))
  await stage(2,'步骤 2/4 · 正在组合对象范围、目标轮廓定位图与编号材质参考')
  const prepared=await prepare({action:'prepare',base:body.base,regions:regions.map(r=>({...r,useImageReference:usesAssetReference(edit.kind,r)}))})
+ plan.output={ratio:job.ratio,instruction:body.options?.ratio && body.options.ratio!=='auto'?'按指定比例调整画面范围，保持主体比例，不拉伸主体；选区外内容需人工复核':'尽量保持底图比例与完整主体'}
  const input={mode:'redraw',prompt:JSON.stringify(plan),images:localEditImages(body.base,prepared,resolved),options:{...body.options,ratio:job.ratio}}
  const request=validate(input,caps)
- job.localEdit={base:body.base,...(resolved.spatialGuidance?{spatialGuidance:resolved.spatialGuidance}:{}),regions:regions.map(r=>({points:r.points,polygons:r.polygons,exclusions:r.exclusions,strokes:r.strokes}))}
+ job.localEdit={base:body.base,...(resolved.spatialGuidance || body.options?.ratio && body.options.ratio!=='auto'?{spatialGuidance:'object-outline'}:{}),regions:regions.map(r=>({points:r.points,polygons:r.polygons,exclusions:r.exclusions,strokes:r.strokes}))}
  delete job.deferredEdit
  job.options={...input.options};await save(job)
  await submit(job,input,request)

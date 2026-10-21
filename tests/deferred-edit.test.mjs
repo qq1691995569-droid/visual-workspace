@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {deferredEdit,prepareDeferredEdit} from '../server/deferred-edit.mjs'
 const asset={kind:'material',name:'织物',image:'data:image/png;base64,AAAA',prompt:'哑光织物',tags:[]}
 const edit={deferredSelection:true,kind:'material',supplement:'仅换材质',regions:[{id:'a',mark:[.2,.2],target:'椅面',asset},{id:'b',mark:[.7,.7],target:'地毯',asset}]}
-function deps(overrides={}){return {save:async()=>{},inspect:async()=>({ratio:'1:1'}),capabilities:async()=>({}),validate:()=>({params:{}}),locate:async()=>({name:'已识别对象',points:[[.1,.1],[.3,.1],[.3,.3],[.1,.3]]}),prepare:async()=>({mask:'mask',outline:'outline',regionMap:'map',atlas:'atlas'}),submit:async()=>{},...overrides}}
+function deps(overrides={}){return {save:async()=>{},inspect:async()=>({width:1000,height:1000}),capabilities:async()=>({routes:{'conversation-image':{available_routes:[{model:'test',supported_aspects:['1:1','16:9','auto']}]}}}),validate:()=>({params:{}}),locate:async()=>({name:'已识别对象',points:[[.1,.1],[.3,.1],[.3,.3],[.1,.3]]}),prepare:async()=>({mask:'mask',outline:'outline',regionMap:'map',atlas:'atlas'}),submit:async()=>{},...overrides}}
 test('仅标记和资产即可排队，不要求前台等待识别范围',()=>{
  assert.equal(deferredEdit(edit).regions.length,2)
  assert.throws(()=>deferredEdit({...edit,regions:[{...edit.regions[0],mark:[2,1]}]}),/标记/)

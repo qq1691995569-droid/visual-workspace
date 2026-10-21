@@ -1,0 +1,72 @@
+html.canvas-preview,html.canvas-preview body{margin:0;background:#f5f7fb;color:#405576;font:13px system-ui,sans-serif}
+.canvas-preview #previewDialog{position:fixed;inset:0;margin:0;padding:0;width:100%;height:100%;max-width:none;max-height:none;border:0;border-radius:0;background:#f5f7fb;color:#405576;overflow:hidden}
+.canvas-preview #previewDialog::backdrop{background:#f5f7fb}
+.canvas-preview .resulthead{display:none}
+.canvas-preview #dialogContent{box-sizing:border-box;height:100%;padding:18px;background:#f5f7fb;color:#405576;border-radius:0;display:flex;flex-direction:column}
+.canvas-preview #dialogContent .bar{gap:10px;flex-shrink:0}
+.canvas-preview #dialogContent .bar button{border:1px solid #dbe4f2;background:white;color:#506685;padding:9px 16px;border-radius:9px;cursor:pointer}
+.canvas-preview #dialogContent .bar button:last-child{background:#3284f6;color:white;border-color:#3284f6}
+.canvas-preview #dialogContent .preview-layout{grid-template-columns:minmax(0,1fr) 300px;min-height:0;flex:1;gap:18px}
+.canvas-preview #dialogContent .preview-image{height:100%;display:flex;flex-direction:column;justify-content:center;overflow:auto}
+.canvas-preview #dialogContent .viewport,.canvas-preview #referencePair:not([hidden]){background:#eaf0f7;border-radius:12px}
+.canvas-preview #referencePair>div{display:flex;flex-direction:column;justify-content:center}
+.canvas-preview #referencePair canvas{max-height:58vh}
+.canvas-preview #dialogContent .preview-parameters{box-sizing:border-box;height:100%;overflow-y:auto;background:#fff;border:1px solid #dfe6f1;border-radius:14px;padding:20px;scrollbar-width:thin;scrollbar-color:#bdcce1 transparent;box-shadow:0 3px 12px #40557606;color:#405576}
+.canvas-preview #dialogContent .preview-parameters::before{content:'调色设置';display:block;font-size:15px;font-weight:650;letter-spacing:.3px;color:#354d70;margin-bottom:20px}
+.canvas-preview #dialogContent .parameter-control span,.canvas-preview #dialogContent h3{color:#405576}
+.canvas-preview #dialogContent .parameter-control{margin-bottom:20px!important}
+.canvas-preview #dialogContent .parameter-control span{align-items:center;font-size:13px;margin-bottom:8px;min-height:28px}
+.canvas-preview #dialogContent output{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-width:44px;height:28px;color:#334f76!important;background:#f0f4fa;border:1px solid #dce5f1;padding:2px 8px;border-radius:6px;font-size:14px;font-weight:650;font-variant-numeric:tabular-nums;line-height:1;opacity:1}
+.canvas-preview #dialogContent input[type=range]{appearance:none;-webkit-appearance:none;display:block;box-sizing:border-box;height:22px;margin:0;padding:0;background:transparent;accent-color:#6397dc}
+.canvas-preview #dialogContent input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:4px;background:#dce5f1}
+.canvas-preview #dialogContent input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:14px;height:14px;margin-top:-5px;border-radius:50%;background:#7097cb;border:2px solid white;box-shadow:0 0 0 1px #7f9fc7,0 2px 4px #40557620}
+.canvas-preview #dialogContent input[type=range]::-moz-range-track{height:4px;border-radius:4px;background:#dce5f1}
+.canvas-preview #dialogContent input[type=range]::-moz-range-thumb{width:11px;height:11px;border-radius:50%;background:#7097cb;border:2px solid white;box-shadow:0 0 0 1px #7f9fc7}
+.canvas-preview #dialogContent input[type=range]:focus-visible{outline:2px solid #9bbce7;outline-offset:4px;border-radius:5px}
+.canvas-preview #dialogContent p{color:#8293ac}
+.canvas-preview #dialogContent #qualityReport{color:#607a9b;background:#f2f6fb}
+.canvas-preview #dialogContent select,.canvas-preview #castTools button{border:1px solid #dce5f2;background:#f8faff;color:#506b94;border-radius:8px;padding:9px;cursor:pointer}
+.canvas-preview #dialogContent select{min-height:38px;font:inherit}
+.canvas-preview #castTools{border:1px solid #e5ebf4;border-radius:10px;background:#f8fafd;padding:12px;margin:4px 0 22px}
+.canvas-preview #castTools::before{content:'参考图增强';display:block;font-size:12px;font-weight:600;color:#7388a5;margin-bottom:10px}
+.canvas-preview #castTools button{background:#fff;min-height:36px;font-size:13px;font-weight:500;box-shadow:0 1px 2px #40557605;transition:background .15s,border-color .15s}
+.canvas-preview #castTools button:hover{border-color:#afc5e2;background:#f0f5fc}
+.canvas-preview #castTools p{font-size:12px;line-height:1.65;color:#7185a1;margin:2px 0 12px}
+.canvas-preview #dialogContent #globalAdjustTitle{font-size:14px;font-weight:650;border-top:1px solid #e8edf5;padding-top:18px;margin:0 0 16px!important}
+.canvas-preview #dialogContent .drag-handle{background:#6b8fbccc}
+.canvas-preview #dialogContent .image-label{background:#526987aa}
+@media(max-width:800px){.canvas-preview #dialogContent{overflow:auto}.canvas-preview #dialogContent .preview-layout{grid-template-columns:1fr;overflow:auto}.canvas-preview #dialogContent .preview-parameters{height:auto;overflow:visible}.canvas-preview #dialogContent .preview-image{height:auto;min-height:220px}}
+
+/* Override the standalone workbench's viewport limits inside the canvas modal. */
+html.canvas-preview,html.canvas-preview body{height:100%;overflow:hidden}
+.canvas-preview #dialogContent{max-height:none;overflow:hidden;padding:12px!important}
+.canvas-preview #dialogContent .preview-layout{grid-template-columns:minmax(0,1fr) 300px!important;align-items:stretch;overflow:hidden}
+.canvas-preview #dialogContent .preview-parameters{max-height:none;min-height:0;padding:14px!important}
+.canvas-preview #dialogContent .preview-parameters::before{margin-bottom:10px;font-size:14px}
+.canvas-preview #dialogContent .preview-parameters>label{margin-bottom:10px!important}
+.canvas-preview #dialogContent .preview-parameters select{min-height:32px;padding:6px 8px;margin-top:4px!important}
+.canvas-preview #castTools{padding:9px;margin:0 0 10px}
+.canvas-preview #castTools::before{margin-bottom:6px}
+.canvas-preview #castTools button{min-height:30px;padding:6px;margin:2px 0 4px!important}
+.canvas-preview #castTools p{font-size:11px;line-height:1.45;margin:0 0 6px}
+.canvas-preview #dialogContent #globalAdjustTitle{padding-top:10px;margin-bottom:8px!important}
+.canvas-preview #dialogContent .parameter-control{margin-bottom:8px!important}
+.canvas-preview #dialogContent .parameter-control span{margin-bottom:2px;min-height:24px;font-size:12px}
+.canvas-preview #dialogContent output{height:24px;min-width:40px;font-size:13px}
+.canvas-preview #dialogContent input[type=range]{height:18px}
+.canvas-preview #dialogContent .preview-image{min-height:0;overflow:hidden}
+.canvas-preview #dialogContent .viewport{min-height:0!important;min-width:0;box-sizing:border-box;flex:1;padding:12px}
+.canvas-preview #referencePair:not([hidden]){height:calc(100% - 36px);min-height:0;box-sizing:border-box;align-items:stretch}
+.canvas-preview #referencePair>div{min-height:0;overflow:hidden;align-items:center}
+.canvas-preview #referencePair canvas{max-height:none;max-width:100%;object-fit:contain}
+.canvas-preview #referenceResultSlot .viewport{width:100%;flex:none;margin:0;padding:0 12px;min-height:0!important}
+.canvas-preview #referencePair>div>small{display:block;flex:none;width:100%;box-sizing:border-box;min-height:20px;margin:0 0 10px;padding:0 6px;line-height:20px;color:#506685;font-size:12px;text-align:center}
+.canvas-preview #referencePair #referenceCompare{flex:none;margin:0 auto}
+.canvas-preview #dialogContent .drag-tip{margin:8px 0 0;flex:none}
+.canvas-preview #divider:focus-visible .comparison-handle{outline:2px solid #92abd0;outline-offset:3px}
+@media(max-width:800px){
+ .canvas-preview #dialogContent .preview-layout{grid-template-columns:minmax(0,1fr)!important;grid-template-rows:minmax(240px,55%) minmax(0,1fr);gap:10px!important}
+ .canvas-preview #dialogContent .preview-image{height:100%;min-height:0}
+ .canvas-preview #dialogContent .preview-parameters{height:100%;overflow:auto}
+ .canvas-preview #dialogContent #previewControls{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+}

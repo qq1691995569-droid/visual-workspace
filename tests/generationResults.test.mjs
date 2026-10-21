@@ -27,3 +27,15 @@ test('重复回填保留原始底图与本次输入的对比快照', () => {
   assert.equal(merged.comparison, comparison)
   assert.deepEqual(resultData({}, { comparison }).comparison, comparison)
 })
+
+test('新一轮沿用修改保存新描述与参数，清掉旧草稿；重复轮询不能覆盖', () => {
+  for (const tool of ['style','light','material','furniture']) {
+    const context = {tool, prompt:'此前要求加本次修改', modification:'地板换浅色', referenceIds:['ref'],options:{ratio:'16:9',count:2}}
+    const merged = resultData({skillResult:{jobId:'old'}, iterationContext:{tool,prompt:'旧要求'},refinementDraft:{prompt:'旧草稿'},localEdit:{supplement:'旧要求'}}, {skillResult:{jobId:'new'},iterationContext:context,localEdit:{supplement:'新要求'}})
+    assert.deepEqual(merged.iterationContext,context)
+    assert.equal(merged.refinementDraft,undefined)
+    assert.equal(merged.localEdit.supplement,'新要求')
+    const typed={...merged,refinementDraft:{prompt:'下一次修改'}}
+    assert.equal(resultData(typed,{skillResult:{jobId:'new'},iterationContext:{prompt:'不应覆盖'}}).refinementDraft.prompt,'下一次修改')
+  }
+})

@@ -1,0 +1,2 @@
+.comparison-handle{position:absolute;top:50%;left:50%;display:grid;place-items:center;box-sizing:content-box;width:38px;height:38px;transform:translate(-50%,-50%);border:1px solid #dfe6ef;border-radius:50%;background:#fffffff2;color:#526581;box-shadow:0 2px 12px #26354b30}
+.comparison-handle svg{width:19px;height:19px;display:block}
