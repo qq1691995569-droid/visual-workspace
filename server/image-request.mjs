@@ -10,13 +10,13 @@ export function imageRequest(body, caps, keys = []) {
   if (!route) throw Error('后台未开放所选模型，请重新选择模型')
   const ratio = raw.ratio || '1:1', resolution = raw.resolution || '2K', count = raw.count ?? 1
   if (!route.supported_aspects?.includes(ratio) || !route.supported_resolutions?.includes(resolution)) throw Error('所选模型不支持此比例或画质，请修改参数')
-  if (!Number.isInteger(count) || count < 1 || count > 4 || count > (route.max_images_per_call || 1) || (route.supported_counts && !route.supported_counts.includes(count))) throw Error('所选模型不支持此张数')
+  if (!Number.isInteger(count) || count < 1 || count > 4 || count > (route.max_images_per_call || 1) || (route.supported_counts && !route.supported_counts.includes(count)) || (route.provider === 'midjourney' && count !== 4)) throw Error('所选模型不支持此张数')
   if (body.mode === 'redraw' && (!Array.isArray(body.images) || body.images.length < 1 || body.images.length > (route.max_reference_images || 9))) throw Error('参考图数量不符合模型要求')
   const qualityMap = { '低': 'low', '中': 'medium', '高': 'high', '超高': 'xhigh', '极致': 'max' }
   const quality = qualityMap[raw.quality] || raw.quality || 'auto'
   if (route.supported_qualities?.length && !route.supported_qualities.includes(quality)) throw Error('模型不支持此精细度，请重新选择')
   const params = { prompt: body.prompt.trim(), route_override: { provider: route.provider, model: route.model }, ratio, resolution, count, interactive: false }
-  if (route.supported_qualities?.length) params.quality = quality
+  if (route.supported_qualities?.length) params.route_override.quality = quality
   if (body.mode === 'redraw') { if (keys.length && keys.length !== body.images.length) throw Error('参考图上传不完整'); params.image_paths = keys }
   return { tool_type: tool, params }
 }

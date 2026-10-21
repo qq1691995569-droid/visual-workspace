@@ -14,8 +14,8 @@ test('图生图直出仍保留底图快照，新增批次绕开既有图片',()=
  assert.deepEqual(composerPosition({x:0,y:0},[],1480,200),{x:0,y:0})
 })
 
-test('复用起始图像节点，1 到 4 张都只补充右侧剩余位置',()=>{
- for(const count of [1,2,3,4]){
+test('复用起始图像节点，1 到 9 张都只补充右侧剩余位置',()=>{
+ for(const count of [1,2,3,4,5,6,7,8,9]){
   const origin={x:420,y:180}
   const batch=composerBatch('existing-image','request','redraw','场景',{...settings,count},origin,{id:'input',src:'reference'},['input','second'])
   assert.equal(batch.controller.id,'existing-image')

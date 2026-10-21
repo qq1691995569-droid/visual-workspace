@@ -18,3 +18,15 @@ test('不支持的模型、比例及数量在上传或提交前拒绝', () => {
   assert.throws(() => imageRequest({ ...body, options: { ...body.options, ratio: '2:1' } }, caps))
   assert.throws(() => imageRequest({ ...body, options: { ...body.options, count: 5 } }, caps))
 })
+
+ test('上限四张，精细度传入路由参数，Midjourney 严格固定四张', () => {
+ const body={prompt:'杯子',mode:'generate',options:{model:route.model,count:4,ratio:'1:1',quality:'high'}}
+ const qualityCaps={routes:{'image-gen':{available_routes:[{...route,supported_qualities:['auto','high']}]}}}
+ const request=imageRequest(body,qualityCaps)
+ assert.equal(request.params.count,4)
+ assert.equal(request.params.route_override.quality,'high')
+ assert.equal('quality' in request.params,false)
+ const mj={routes:{'image-gen':{available_routes:[{...route,provider:'midjourney',max_images_per_call:4}]}}}
+ assert.throws(()=>imageRequest({...body,options:{...body.options,count:1}},mj))
+ assert.equal(imageRequest({...body,options:{...body.options,count:4}},mj).params.count,4)
+ })

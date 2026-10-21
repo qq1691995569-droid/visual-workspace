@@ -1,0 +1,111 @@
+/* Canvas composer: calm surfaces, legible type and one primary action. */
+.app-shell .creation-dock {
+  --composer-ink: #25344a;
+  --composer-muted: #64748b;
+  left: 50%;
+  width: min(860px, calc(100vw - 144px));
+  max-width: calc(100vw - 144px);
+  bottom: 24px;
+  border: 1px solid #dce3ec;
+  border-radius: 20px;
+  background: #fffffffa;
+  box-shadow: 0 16px 48px #1e293b12, 0 2px 8px #1e293b08;
+  padding: 18px 20px 12px;
+  color: var(--composer-ink);
+}
+.app-shell .creation-dock.minimized { width: 360px; padding: 12px 16px; }
+.app-shell .creation-dock .dock-heading { gap: 16px; margin-bottom: 16px; }
+.app-shell .creation-dock .dock-heading strong { color: #25344a; font-size: 14px; font-weight: 650; }
+.app-shell .creation-dock .dock-heading svg { color: #526d99; }
+.app-shell .creation-dock .dock-heading button { color: #53647b; min-height: 30px; }
+.app-shell .creation-dock .dock-heading > div:last-child { margin-left: auto; }
+.app-shell .creation-dock .dock-heading .composer-mode-tabs {
+  flex: 0 1 auto; padding: 3px; gap: 2px; background: #f1f4f8;
+  border: 1px solid #e8edf3; border-radius: 9px;
+}
+.app-shell .creation-dock .dock-heading .composer-mode-tabs button {
+  padding: 5px 10px; border-radius: 6px; font-size: 12px;
+}
+.app-shell .creation-dock .dock-heading .composer-mode-tabs button[aria-pressed="true"] {
+  background: #fff; color: #274d86; box-shadow: 0 1px 3px #182a4314;
+}
+.app-shell .creation-dock .dock-heading .composer-mode-tabs button[aria-pressed="false"] {
+  background: transparent; color: #64748b;
+}
+.app-shell .creation-dock .composer-mode-tabs button:disabled { opacity: .45; cursor: not-allowed; }
+.app-shell .creation-dock .dock-workspace { gap: 10px; }
+.app-shell .creation-dock .creation-modes { gap: 6px; }
+.app-shell .creation-dock .creation-modes button { color: #53647b; min-height: 32px; border-radius: 7px; }
+.app-shell .creation-dock .creation-modes button.chosen { background: #edf3ff; color: #285bbb; font-weight: 600; }
+.app-shell .creation-dock .creation-modes button:last-child { color: #53647b; border: 1px solid #e2e8f0; background: #fff; }
+.app-shell .creation-dock .creation-input { background: #f8fafc; border: 1px solid #e1e7ef; border-radius: 12px; padding: 12px 14px; box-shadow: none; }
+.app-shell .creation-dock .creation-input:focus-within { border-color: #7ba4e5; box-shadow: 0 0 0 3px #326ce310; background: #fff; }
+.app-shell .creation-dock .creation-input .composer-input-label { margin-bottom: 4px; justify-content: flex-end; }
+.app-shell .creation-dock .creation-input .composer-input-label strong,
+.app-shell .creation-dock .creation-input .composer-input-label > span { font-size: 11px; color: #64748b; }
+.app-shell .creation-dock .creation-input textarea { height: 72px; min-height: 54px; max-height: 180px; font-size: 14px; line-height: 1.75; color: #25344a; }
+.app-shell .creation-dock .creation-input textarea::placeholder { color: #78869a; }
+.app-shell .creation-dock .dock-footer { margin-top: 14px; gap: 12px; align-items: center; }
+.app-shell .creation-dock .generation-controls { gap: 6px; }
+.app-shell .creation-dock .parameter-trigger { background: #fff; border: 1px solid #e1e7ef; box-shadow: none; border-radius: 8px; min-height: 34px; padding: 7px 9px; color: #41516a; font-size: 12px; }
+.app-shell .creation-dock .parameter-trigger:hover,
+.app-shell .creation-dock .parameter-trigger.expanded { background: #edf3ff; color: #285bbb; border-color: #bdcff0; }
+.app-shell .creation-dock .dock-submit { min-height: 38px; padding: 9px 18px !important; color: white; background: #2d63cc; border: 1px solid #2d63cc; border-radius: 9px; box-shadow: 0 2px 4px #285bbb20; font-weight: 600; }
+.app-shell .creation-dock .dock-submit:hover:not(:disabled) { background: #2254b7; border-color: #2254b7; }
+.app-shell .creation-dock .dock-submit:disabled { background: #e9eef5; border-color: #e2e8f0; color: #8390a2; opacity: 1; box-shadow: none; }
+.app-shell .creation-dock .dock-status { color: #68788f; font-size: 11px; margin-top: 10px; padding-top: 0; border: 0; }
+.app-shell .creation-dock .composer-reference-tray {
+  background: #fbfcfe;
+  border: 1px solid #e6ebf2;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  gap: 10px;
+}
+.app-shell .creation-dock .composer-reference-tray .composer-input-label {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.app-shell .creation-dock .composer-reference-tray .reference-strip > small {
+  font-size: 10px;
+  line-height: 1.5;
+}
+.app-shell .creation-dock .composer-reference-tray .composer-input-label { color: #53647b; }
+.app-shell .creation-dock .parameter-popover { background: #fff; border: 1px solid #dce3ec; box-shadow: 0 12px 36px #1e293b20; border-radius: 14px; padding: 16px; max-height: min(430px, calc(100dvh - 360px)); overflow-y: auto; }
+.app-shell .creation-dock .parameter-title,
+.app-shell .creation-dock .model-list strong { color: #25344a; }
+.app-shell .creation-dock .parameter-description,
+.app-shell .creation-dock .model-list small { color: #64748b; }
+.app-shell .creation-dock .model-avatar { box-shadow: none; background: #f1f5fb; color: #49658e; border: 1px solid #e1e7ef; }
+.app-shell .creation-dock .option-grid > button,
+.app-shell .creation-dock .ratio-grid button { box-shadow: none; color: #52647e; background: #f8fafc; border-color: #e1e7ef; }
+.app-shell .creation-dock .option-grid > button.picked,
+.app-shell .creation-dock .ratio-grid button.picked { color: #285bbb; background: #edf3ff; border-color: #a9c3ee; }
+.app-shell .creation-dock .count-option-grid { display: grid; grid-template-columns: repeat(3, 1fr); }
+.app-shell .creation-dock button:focus-visible { outline: 2px solid #2d63cc; outline-offset: 3px; }
+.app-shell .empty-state h1 { color: #475b77; }
+.app-shell .empty-state p { color: #718198; }
+@media (max-width: 700px) {
+  .app-shell .creation-dock { width: calc(100vw - 24px); max-width: calc(100vw - 24px); bottom: 12px; padding: 14px; border-radius: 16px; }
+  .app-shell .creation-dock .dock-heading { flex-wrap: wrap; gap: 8px; }
+  .app-shell .creation-dock .dock-heading .composer-mode-tabs { order: 3; flex-basis: 100%; justify-content: flex-start; }
+  .app-shell .creation-dock .dock-footer { flex-wrap: wrap; }
+  .app-shell .creation-dock .dock-submit { margin-left: auto; }
+  .app-shell .creation-dock .creation-input .composer-input-label > span { display: none; }
+  .app-shell .creation-dock .parameter-popover { max-height: 260px; }
+}
+@media (max-height: 700px) {
+  .app-shell .creation-dock { bottom: 10px; padding-top: 12px; }
+  .app-shell .creation-dock .dock-heading { margin-bottom: 8px; }
+  .app-shell .creation-dock .creation-input textarea { height: 48px; min-height: 40px; }
+  .app-shell .creation-dock .parameter-popover { max-height: 210px; }
+}
+
+/* Popovers extend above the dock; only their own content should scroll. */
+.app-shell .creation-dock:not(.minimized) { overflow: visible; }
+.app-shell .creation-dock .count-option-grid { grid-template-columns: repeat(2, 1fr); }
+
+.app-shell .creation-dock .creation-input textarea { padding-top: 0; }
+.app-shell .creation-dock .composer-reference-hint { margin-left: auto; font-size: 11px; color: #78869a; }
+.app-shell .creation-dock .creation-modes .composer-reference-hint + button { margin-left: 4px; }
+@media (max-width: 600px) { .app-shell .creation-dock .composer-reference-hint { display: none; } }

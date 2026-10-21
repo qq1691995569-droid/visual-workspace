@@ -512,9 +512,9 @@ async function handle(method, url, body) {
   if (method === 'POST' && url === '/api/skills/admin/publish') return registry.publish(body)
   if (method === 'POST' && url === '/api/skills/admin/activate') return registry.activate(body.version)
   if (method === 'GET' && url === '/api/skills/status') {
-    let dreoConnected = false, models = []
-    try { models = modelRoutes(await dreo('GET', '/capabilities')); dreoConnected = true } catch { /* Safe status only. */ }
-    return { dreoConnected, modelAvailable: models.some(r => r.model === MODEL), models, visionConfigured: visionConfigured(), skillVersion: (await registry.active()).version }
+    let dreoConnected = false, models = [], imageRoutes = {}
+    try { const caps = await dreo('GET', '/capabilities'); models = modelRoutes(caps); imageRoutes = caps.routes || {}; dreoConnected = true } catch { /* Safe status only. */ }
+    return { dreoConnected, imageRoutes, modelAvailable: models.some(r => r.model === MODEL), models, visionConfigured: visionConfigured(), skillVersion: (await registry.active()).version }
   }
   if (method === 'POST' && url === '/api/skills/style/run') {
     if (!imageValid(body.base) || !Array.isArray(body.references) || body.references.length < 1 || body.references.length > 3 || !body.references.every(imageValid)) throw Error('请连接底图与 1–3 张风格参考')
