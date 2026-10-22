@@ -24,7 +24,6 @@
 .refine-editor:focus-within { background:light-dark(#fff, #242830); border-color:light-dark(#b2c4df, #3b424e); box-shadow:0 0 0 3px light-dark(#87a6d00c, #0000000c); }
 .refine-editor textarea { display:block; width:100%; box-sizing:border-box; padding:14px 15px 7px; min-height:86px; max-height:180px; resize:vertical; border:0; outline:none; background:transparent; color:light-dark(#40516a, #e3e7ee); font:inherit; font-size:var(--text-body,14px); line-height:1.8; box-shadow:none; }
 .refine-editor textarea::placeholder { color:light-dark(#a9b3c2, #929eaf); }
-.refine-editor-caption { display:flex; justify-content:space-between; gap:8px; padding:2px 15px 10px; font-size:var(--text-micro,11px); color:light-dark(#a4aebe, #929eaf); }
 .refine-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:12px; }
 .refine-controls { display:flex; flex-wrap:wrap; align-items:center; gap:5px; min-width:0; }
 .refine-param { display:flex; align-items:center; gap:5px; padding:6px 7px; border:1px solid transparent; border-radius:7px; color:light-dark(#8a97aa, #b7c0ce); transition:background .15s; }
@@ -47,3 +46,4 @@
 .refine-heading-actions { display:flex; align-items:center; gap:10px; }
 .refine-compare { display:flex; align-items:center; gap:5px; padding:5px 8px; border:1px solid light-dark(#e1e7ef, #3b424e); border-radius:6px; background:light-dark(#f6f8fb, #242830); color:light-dark(#7d8ea6, #b7c0ce); font-size:var(--text-caption,12px); }
 .refine-compare:hover { background:light-dark(#edf2f9, #1e2229); color:light-dark(#5e7da7, rgb(149 180 207)); }
+.refine-editor textarea{user-select:text;-webkit-user-select:text}

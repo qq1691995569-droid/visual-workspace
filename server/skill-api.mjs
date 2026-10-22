@@ -1,4 +1,6 @@
+import {textureRestore} from './texture-restore.mjs'
 import {liblibUpscale} from './liblib-upscale.mjs'
+import {prepareReference,referenceLimits} from './reference-image.mjs'
 import {sharedUpscale} from './upscale-connection.mjs'
 import {safeTaskMessage} from './task-monitor.mjs'
 import {imageToolError} from './image-tool-error.mjs'
@@ -239,7 +241,9 @@ async function submit(job, prepared) {
   try {
     job.status = 'uploading'; job.message = '上传灰度稿与结构线稿'; await save(job)
     const keys = []
-    for (const image of [prepared.gray, prepared.line]) { const result = await dreo('POST', '/upload', { image }); if (!result.storage_key) throw Error('上传未返回 storage_key'); keys.push(result.storage_key) }
+    const limits=referenceLimits(await dreo('GET','/capabilities'),{tool_type:'conversation-image',params:{route_override:{provider:job.options?.provider||'seedream',model:job.options?.model||MODEL}}})
+    job.referencePreparation=[]
+    for (const original of [prepared.gray, prepared.line]) { const {image,...metadata}=await prepareReference(original,limits);job.referencePreparation.push(metadata);const result = await dreo('POST', '/upload', { image }); if (!result.storage_key) throw Error('上传未返回 storage_key'); keys.push(result.storage_key) }
     const request = generationRequest(job.plan, keys, job.ratio, job.rules || rules, job.options)
     job.status = 'submitting'; job.message = '正在提交生成任务'; await save(job)
     job.submissionAttemptedAt=new Date().toISOString();await save(job)
@@ -263,7 +267,9 @@ async function submitImage(job, body, request) {
     job.status = 'uploading'; if(job.phase)job.phase={step:3,total:4};job.message = job.phase?'步骤 3/4 · 正在上传组合后的图像参考':body.mode === 'redraw' ? '正在上传参考图' : '准备提交生图'; await save(job)
     if (body.mode === 'redraw') {
       const keys = []
-      for (const image of body.images) { const uploaded = await dreo('POST', '/upload', { image }); if (!uploaded.storage_key) throw Error('参考图上传失败'); keys.push(uploaded.storage_key) }
+      const limits=referenceLimits(await dreo('GET','/capabilities'),request)
+      job.referencePreparation=[]
+      for (const original of body.images) { const {image,...metadata}=await prepareReference(original,limits);job.referencePreparation.push(metadata);const uploaded = await dreo('POST', '/upload', { image }); if (!uploaded.storage_key) throw Error('参考图上传失败'); keys.push(uploaded.storage_key) }
       request.params.image_paths = keys
     }
     job.status = 'submitting'; job.message = job.phase?'步骤 3/4 · 正在提交生图任务':'正在提交 DREO 生图任务'; await save(job)
@@ -312,7 +318,9 @@ const handleUpscale=upscaleBridge({dreo,load,save,active,monitor,publicJob,image
   await mkdir(store,{recursive:true})
   try{await writeFile(idPath(job.id),JSON.stringify({...job,functionConfig:job.functionConfig||configSnapshot()}),{flag:'wx'});return true}catch(error){if(error.code==='EEXIST')return false;throw error}
 }})
+const handleTexture=textureRestore({inspect:base=>assetImageTool({action:'inspect',base}),load,save,submit:submitImage,sync:syncJob,publicJob,vision,valid:imageValid,capabilities:async()=>{if(!visionConfigured())throw Error('请在后台配置视觉分析接口');return dreo('GET','/capabilities')},create:async job=>{await mkdir(store,{recursive:true});try{await writeFile(idPath(job.id),JSON.stringify(job),{flag:'wx'});return true}catch(e){if(e.code==='EEXIST')return false;throw e}}})
 async function handle(method, url, body) {
+ if(url.startsWith('/api/skills/texture-restore/'))return handleTexture(method,url,body)
   const shared=await sharedUpscale(store,method,url,body);if(shared!==undefined)return shared
   const liblibResult=await localLiblib.handle(method,url,body);if(liblibResult!==undefined)return liblibResult
   const upscaleResult=await handleUpscale(method,url,body);if(upscaleResult!==undefined)return upscaleResult
@@ -622,7 +630,7 @@ async function handle(method, url, body) {
     void submit(job, prep); return publicJob(job)
   }
   if (method === 'GET' && /^\/api\/skills\/(style|images)\/tasks\/[a-f0-9-]{36}$/.test(url)) {
-    let job;try{job=await load(url.split('/').pop())}catch(error){if(error.code==='ENOENT')throw Object.assign(Error('此任务的本地记录不存在'),{code:'TASK_NOT_FOUND'});throw error} if (job.type !== 'generation') throw Error('不是生成任务')
+    let job;try{job=await load(url.split('/').pop())}catch(error){if(error.code==='ENOENT')throw Object.assign(Error('此任务的本地记录不存在'),{code:'TASK_NOT_FOUND'});throw error} if(job.type==='texture-preparation')return handleTexture('GET','/api/skills/texture-restore/tasks/'+job.id,{}); if (job.type !== 'generation') throw Error('不是生成任务')
     if(job.provider==='liblib')return publicJob(await localLiblib.sync(job))
     if(!active.has(job.id)&&!job.taskId&&['locating','composing'].includes(job.status)){job.status='paused';job.message='后台识别或组合被服务重启中断，尚未提交生图；请重新生成';await save(job)}
     if (!job.separation && !active.has(job.id) && !job.taskId && ['preparing','analyzing','queued','uploading','submitting'].includes(job.status)) { job.status = 'submission_unknown'; job.message = '本地进程曾中断，请在 DREO 核对后处理；不会自动重新提交'; await save(job) }

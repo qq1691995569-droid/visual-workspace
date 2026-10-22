@@ -28,7 +28,7 @@ export function GenerationControls({ value, onChange, placement = 'dock', mode =
   const controls = [
     { id: 'model' as const, label: '生图模型', text: live?.display_name || model.name, icon: Box },
     { id: 'resolution' as const, label: '分辨率', text: value.resolution, icon: Sparkles },
-    { id: 'ratio' as const, label: '画面比例', text: value.ratio, icon: Ratio },
+    { id: 'ratio' as const, label: '画面比例', text: String(value.ratio)==='auto'?'沿用原图':value.ratio, icon: Ratio },
     { id: 'quality' as const, label: '生成精细度', text: value.quality, icon: SlidersHorizontal },
     { id: 'count' as const, label: '输出数量', text: `${value.count} 张`, icon: Copy },
   ]

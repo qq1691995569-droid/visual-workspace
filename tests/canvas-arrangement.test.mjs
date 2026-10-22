@@ -46,9 +46,9 @@ test('节点整理按依赖分列、同层纵向排列，保留未选节点、�
  const next=arrangeWorkflow(nodes,edges),get=id=>next.find(n=>n.id===id)
  assert.ok(get('base').position.x+100<get('tool').position.x)
  assert.ok(get('tool').position.x+180<get('r0').position.x)
- assert.equal(get('r0').position.x,get('r3').position.x)
- assert.ok(get('r3').position.y>get('r0').position.y)
- assert.ok(get('r4').position.y>get('r0').position.y)
+ assert.equal(get('r0').position.y,get('r3').position.y)
+ assert.ok(get('r3').position.x>get('r0').position.x)
+ assert.equal(get('r4').position.y,get('r0').position.y)
 
  assert.equal(next.at(-1),nodes.at(-1));assert.deepEqual(next.map(n=>n.style),nodes.map(n=>n.style))
  for(let i=0;i<next.length-1;i++)for(let j=i+1;j<next.length-1;j++){const a=next[i],b=next[j];assert.ok(a.position.x+a.style.width<=b.position.x||b.position.x+b.style.width<=a.position.x||a.position.y+a.style.height<=b.position.y||b.position.y+b.style.height<=a.position.y)}
@@ -72,4 +72,20 @@ test('分支按来源排列，父节点居中且重复整理位置稳定',()=>{
  assert.equal(Math.sign(get('a2').position.y-get('b1').position.y),direction)
  assert.ok(Math.abs(get('a').position.y-(get('a1').position.y+get('a2').position.y)/2)<1)
  assert.deepEqual(arrangeWorkflow(next,edges),next)
+})
+test('inline first result and its siblings form one row before downstream tasks',()=>{
+ const nodes=[node('base',0,0),...Array.from({length:4},(_,i)=>({...node('r-'+i,400+i*50,i*200),data:{kind:'image',imageOutput:i===0,skillResult:{jobId:'same-task',sourceNode:'r-0'}}})),{...node('next',1200,900),data:{kind:'image',skillResult:{jobId:'next-task',sourceNode:'r-2'}}}]
+ const edges=[{source:'base',target:'r-0'},...[1,2,3].map(i=>({source:'r-0',target:'r-'+i})),{source:'r-2',target:'next'}]
+ const next=arrangeWorkflow(nodes,edges),row=next.slice(1,5)
+ assert.equal(new Set(row.map(n=>n.position.y)).size,1)
+ for(let i=1;i<row.length;i++)assert.ok(row[i].position.x>=row[i-1].position.x+row[i-1].style.width+40)
+ assert.ok(next.at(-1).position.x>=row.at(-1).position.x+row.at(-1).style.width)
+ assert.deepEqual(arrangeWorkflow(next,edges),next)
+})
+
+test('收拢卡片并排移动，内部图片不参与且保留局部位置',()=>{
+ const a={...node('ga',10,40,280,330),width:280,height:330,data:{kind:'group',collapsed:true}},b={...node('gb',10,500,280,330),width:280,height:330,data:{kind:'group',collapsed:true}}
+ const child={...node('child',30,60),parentId:'gb'},nodes=[a,b,child]
+ const next=arrangeCanvas(nodes,'row');assert.deepEqual(next[0].position,{x:10,y:40});assert.deepEqual(next[1].position,{x:326,y:40});assert.deepEqual(next[2],child)
+ const command=graphCommand({nodes,edges:[]},{nodes:next,edges:[]});assert.deepEqual(applyGraphCommand({nodes:next,edges:[]},command,'undo').nodes,nodes)
 })

@@ -243,7 +243,6 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline-color:li
 /* Short data packets flow source → target without per-frame React updates. */
 .edge-data-stream{stroke:light-dark(#e5f1fa, #929eaf);stroke-width:1.8;stroke-linecap:round;stroke-dasharray:2 18;stroke-dashoffset:0;opacity:0;animation:edge-data-travel 1.2s linear infinite;animation-play-state:paused;transition:opacity .2s;pointer-events:none}
 .edge-data-stream.is-transmitting{opacity:.95;animation-play-state:running;filter:drop-shadow(0 0 1.2px #aec5dc80)}
-.react-flow__edge:hover .edge-data-stream{opacity:.95;animation-play-state:running;filter:drop-shadow(0 0 1.2px #aec5dc80)}
 @keyframes edge-data-travel{to{stroke-dashoffset:-100}}
 .canvas-surface.middle-panning .edge-data-stream{animation-play-state:paused}
 @media(prefers-reduced-motion:reduce){.edge-data-stream,.edge-data-stream.is-transmitting,.react-flow__edge:hover .edge-data-stream{animation:none;opacity:0}}
@@ -337,3 +336,6 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline-color:li
 .react-flow.viewport-interacting .workflow-group { box-shadow:none !important; }
 .react-flow.viewport-interacting .image-origin-label { text-shadow:none; }
 .react-flow.viewport-interacting .edge-data-stream { animation-play-state:paused; }
+.card.clean-image .image-origin-label{inset:calc(8px * var(--image-meta-scale,1)) calc(8px * var(--image-meta-scale,1)) auto auto;max-width:calc(100% - 36px);height:auto;margin:0;padding:2px 5px;border:0;border-radius:5px;background:rgba(20,25,32,.48);color:white;font-size:calc(11px * var(--image-meta-scale,1));line-height:1.4;text-shadow:0 1px 2px #0008;pointer-events:none;user-select:none;overflow:hidden}
+.card.clean-image .image-origin-label>svg{width:1.1em;height:1.1em}
+.card.clean-image .image-origin-label>small{font-size:.85em;color:inherit}

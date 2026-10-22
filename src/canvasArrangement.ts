@@ -15,10 +15,21 @@ export function avoidExpandedOverlap<N extends Node>(nodes:N[],id:string):N[]{
  const position=candidates.filter(clear).sort((a,b)=>(a.x-at.x)**2+(a.y-at.y)**2-((b.x-at.x)**2+(b.y-at.y)**2))[0]
  return fitted.map(n=>n.id===root.id?{...n,position}:n)
 }
+// Folded collections move as a single card; their children retain local positions.
+export function rowSelection<N extends Node>(nodes:N[]):N[]{
+ const byId=new Map(nodes.map(n=>[n.id,n]))
+ return nodes.filter(n=>{
+  if(!n.selected||n.hidden||!(n.data.kind==='image'||n.data.kind==='group'&&n.data.collapsed))return false
+  let parent=n.parentId;const seen=new Set<string>()
+  while(parent&&!seen.has(parent)){seen.add(parent);const ancestor=byId.get(parent);if(ancestor?.hidden||ancestor?.data.collapsed)return false;parent=ancestor?.parentId}
+  return true
+ })
+}
 export function arrangeCanvas<N extends Node>(nodes:N[],action:Arrangement):N[]{
  const ids=new Set(nodes.filter(n=>n.selected).map(n=>n.id))
- const chosen=nodes.filter(n=>n.selected&&!n.hidden&&(action==='row'?n.data.kind==='image':!(n.parentId&&ids.has(n.parentId))))
+ const chosen=action==='row'?rowSelection(nodes):nodes.filter(n=>n.selected&&!n.hidden&&!(n.parentId&&ids.has(n.parentId)))
  if(chosen.length<2)return nodes
+
  const items=chosen.map(n=>({n,p:absolutePosition(n.id,nodes),...size(n)}))
  const left=Math.min(...items.map(i=>i.p.x)),right=Math.max(...items.map(i=>i.p.x+i.w)),top=Math.min(...items.map(i=>i.p.y)),bottom=Math.max(...items.map(i=>i.p.y+i.h))
  const places=new Map<string,{x:number;y:number}>()
@@ -46,6 +57,35 @@ export function arrangeWorkflow<N extends Node>(nodes:N[],edges:{source:string;t
  const selected=new Set(nodes.filter(n=>n.selected&&!n.hidden).map(n=>n.id))
  const chosen=nodes.filter(n=>{if(!selected.has(n.id))return false;let parent=n.parentId;const seen=new Set<string>();while(parent&&!seen.has(parent)){if(selected.has(parent))return false;seen.add(parent);parent=nodes.find(p=>p.id===parent)?.parentId}return true})
  if(chosen.length<2)return nodes
+ // A generation can replace its owner with result #1. Its remaining results
+ // still link to that owner, but they are siblings, not another workflow step.
+ const batches=new Map<string,N[]>()
+ for(const node of chosen){
+  if(node.data.kind!=='image')continue
+  const result=(node.data.pendingResult||node.data.skillResult) as {jobId?:string}|undefined
+  const job=result?.jobId
+  if(!job)continue
+  const key=JSON.stringify([node.parentId||'',job])
+  batches.set(key,[...(batches.get(key)||[]),node])
+ }
+
+ const rows=[...batches.values()].filter(row=>row.length>1)
+ if(rows.length){
+  const replacement=new Map<string,string>(),virtuals:N[]=[]
+  const memberships=new Map<string,N[]>()
+  for(const row of rows){
+   row.sort((a,b)=>{const index=(n:N)=>{const pending=n.data.pendingResult as {index?:number}|undefined;return pending?.index ?? (n.data.imageOutput?0:Number(n.id.match(/-(\d+)$/)?.[1]||0))};return index(a)-index(b)||a.position.x-b.position.x})
+   let id=`layout-batch-${row[0].id}`;while(nodes.some(n=>n.id===id))id+='-'
+   row.forEach(n=>replacement.set(n.id,id));memberships.set(id,row)
+   const points=row.map(n=>absolutePosition(n.id,nodes))
+   virtuals.push({id,type:'card',selected:true,position:{x:Math.min(...points.map(p=>p.x)),y:Math.min(...points.map(p=>p.y))},style:{width:row.reduce((sum,n)=>sum+size(n).w,0)+(row.length-1)*40,height:Math.max(...row.map(n=>size(n).h))},data:{kind:'layout-batch'}} as unknown as N)
+  }
+  const mappedEdges=[...edges,...chosen.flatMap(n=>{const r=(n.data.skillResult||n.data.pendingResult) as {sourceNode?:string}|undefined;return r?.sourceNode?[{source:r.sourceNode,target:n.id}]:[]})].map(e=>({source:replacement.get(e.source)||e.source,target:replacement.get(e.target)||e.target})).filter(e=>e.source!==e.target)
+  const arranged=arrangeWorkflow([...nodes.filter(n=>!replacement.has(n.id)),...virtuals],mappedEdges)
+  const positions=new Map<string,{x:number;y:number}>()
+  for(const [id,row] of memberships){let p=absolutePosition(id,arranged);for(const node of row){positions.set(node.id,{...p});p={x:p.x+size(node).w+40,y:p.y}}}
+  return fitGroupNodes(nodes.map(node=>{const p=positions.get(node.id);if(p){const parent=node.parentId?absolutePosition(node.parentId,arranged):{x:0,y:0};return {...node,position:{x:p.x-parent.x,y:p.y-parent.y}}}return arranged.find(n=>n.id===node.id)||node}))
+ }
  const byId=new Map(chosen.map(n=>[n.id,n])),positions=new Map(chosen.map(n=>[n.id,absolutePosition(n.id,nodes)]))
  const compare=(a:string,b:string)=>positions.get(a)!.y-positions.get(b)!.y||positions.get(a)!.x-positions.get(b)!.x||a.localeCompare(b)
  const incoming=new Map(chosen.map(n=>[n.id,new Set<string>()])),outgoing=new Map(chosen.map(n=>[n.id,new Set<string>()]))

@@ -10,7 +10,7 @@ type Feature={id:string;name:string;enabled:boolean;persona:string;text:string}
 type Config={schema:1;revision:number;features:Feature[];switches?:Record<string,boolean>}
 type Registry={builtinRules?:Record<string,string>;switchDefinitions?:{id:string;name:string}[];draft:Config;active:Config;versions:Config[];editRevision:number;audit:{at:string;revision:number;action:string}[]}
 const directoryGroups = [
- {id:'connection',name:'连线技能',description:'从图片连线后选择',icon:Workflow,ids:['style','model','material','light']},
+ {id:'connection',name:'连线技能',description:'从图片连线后选择',icon:Workflow,ids:['style','model','material','light','texture-restore']},
  {id:'toolbar',name:'图片工具栏',description:'选中图片后，上方显示',icon:PanelTop,ids:['edit','redraw','separate','background','erase','expand','upscale']},
 ]
 const otherGroup={id:'other',name:'其他功能',description:'兼容保留的处理规则',icon:Archive,ids:[] as string[]}

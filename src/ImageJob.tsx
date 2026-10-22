@@ -1,7 +1,7 @@
 import { TaskTiming, type TaskTimingState } from './TaskTiming'
 import { useEffect, useRef } from 'react'
 import type { SkillResult } from './SkillNode'
-export type ImageJobState = TaskTimingState & { phase?:{step:number;total:number}; id?: string; requestId?: string; status: string; message: string; queryAttempt?:number; monitoringStopped?:boolean; taskId?:string }
+export type ImageJobState = TaskTimingState & { aliasJobIds?:string[]; phase?:{step:number;total:number}; id?: string; requestId?: string; status: string; message: string; queryAttempt?:number; monitoringStopped?:boolean; taskId?:string }
 export function ImageJob({ job, onChange, onResults, endpoint = 'images', monitor = true, submitting = false }: { submitting?:boolean; monitor?: boolean; endpoint?: 'images' | 'style'; job: ImageJobState; onChange: (job: ImageJobState) => void; onResults: (id: string, results: SkillResult[]) => void | Promise<void> }) {
   const latest = useRef({ job, onChange, onResults })
   useEffect(() => { latest.current = { job, onChange, onResults } })
@@ -24,7 +24,7 @@ export function ImageJob({ job, onChange, onResults, endpoint = 'images', monito
         failures = 0
         if (result.images?.length) await latest.current.onResults(result.id, result.images)
         if (stopped) return
-        latest.current.onChange({ ...latest.current.job, taskId:result.taskId, phase:result.phase, createdAt: result.createdAt, finishedAt: result.finishedAt, serverNow: result.serverNow, id: result.id, status: result.status, message: [result.message, result.warning].filter(Boolean).join('；') })
+        latest.current.onChange({ ...latest.current.job, aliasJobIds:result.aliasJobIds, taskId:result.taskId, phase:result.phase, createdAt: result.createdAt, finishedAt: result.finishedAt, serverNow: result.serverNow, id: result.id, status: result.status, message: [result.message, result.warning].filter(Boolean).join('；') })
         if (['complete','paused','submission_unknown','connection_lost','needs_attention'].includes(result.status)) return
       } catch {
         if (stopped) return
