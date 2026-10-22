@@ -37,3 +37,6 @@ __pycache__/
 .venv/
 
 .canvas-runtime/
+upscale-connection*.json
+upscale-sharing.json
+upscale-share-key.pem

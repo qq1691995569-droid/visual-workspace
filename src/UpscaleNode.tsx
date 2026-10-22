@@ -20,7 +20,7 @@ export function UpscaleNode({inputs,state,job,onChange,onJob}:{inputs:SkillInput
  const workflow=catalog.items.find(item=>item.id===state.workflowId)||catalog.items.find(item=>item.is_default)||catalog.items[0]
  const values=state.workflowId===workflow?.id&&state.workflowVersion===workflow?.version?state.paramValues||{}:{}
  async function refresh(){setLoading(true);setError('');try{setCatalog(await api('/api/skills/upscale/workflows'))}catch(e){setError(e instanceof Error?e.message:'无法读取放大工作流')}finally{setLoading(false)}}
- useEffect(()=>{void refresh()},[])
+ useEffect(()=>{void refresh();const update=()=>{if(!document.hidden)void refresh()};const timer=setInterval(update,60000);window.addEventListener('focus',update);return()=>{clearInterval(timer);window.removeEventListener('focus',update)}},[])
  function defaults(item:Workflow){return Object.fromEntries(item.editable_params.map(group=>[group.node_id,Object.fromEntries(group.params.map(param=>[param.name,param.default]))]))}
  function choose(item:Workflow){onChange({...state,workflowId:item.id,workflowVersion:item.version,paramValues:defaults(item)})}
  function parameterInput(group:{node_id:string},param:Parameter){

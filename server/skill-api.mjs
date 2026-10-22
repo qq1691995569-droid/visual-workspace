@@ -1,4 +1,5 @@
 import {liblibUpscale} from './liblib-upscale.mjs'
+import {sharedUpscale} from './upscale-connection.mjs'
 import {safeTaskMessage} from './task-monitor.mjs'
 import {imageToolError} from './image-tool-error.mjs'
 import {functionStore,manageConfig,adminKey} from './config-admin.mjs'
@@ -312,6 +313,7 @@ const handleUpscale=upscaleBridge({dreo,load,save,active,monitor,publicJob,image
   try{await writeFile(idPath(job.id),JSON.stringify({...job,functionConfig:job.functionConfig||configSnapshot()}),{flag:'wx'});return true}catch(error){if(error.code==='EEXIST')return false;throw error}
 }})
 async function handle(method, url, body) {
+  const shared=await sharedUpscale(store,method,url,body);if(shared!==undefined)return shared
   const liblibResult=await localLiblib.handle(method,url,body);if(liblibResult!==undefined)return liblibResult
   const upscaleResult=await handleUpscale(method,url,body);if(upscaleResult!==undefined)return upscaleResult
   if(method==='DELETE'&&/^\/api\/skills\/tasks\/[a-f0-9-]{36}$/.test(url)){
