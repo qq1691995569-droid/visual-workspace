@@ -1,5 +1,5 @@
 import {projectAssetStore} from './projectAssetStore'
-type IO={get:(key:string)=>Promise<unknown>;getMany:(keys:string[])=>Promise<unknown[]>;setMany:(entries:[string,unknown][])=>Promise<void>;keys:()=>Promise<string[]>}
+type IO={delMany:(keys:string[])=>Promise<void>;get:(key:string)=>Promise<unknown>;getMany:(keys:string[])=>Promise<unknown[]>;setMany:(entries:[string,unknown][])=>Promise<void>;keys:()=>Promise<string[]>}
 export type ProjectSummary={id:string;name:string;updatedAt:number;createdAt:number;count:number;cover?:string;coverVersion?:number;deletedAt?:number}
 type Doc={name:string;nodes:{data:{src?:string;previewSrc?:string;kind?:string}}[];[key:string]:unknown}
 const activeKey='canvas-project-active',prefix='canvas-project-meta:'
@@ -31,6 +31,11 @@ export function projectCatalog(io:IO,cover:(src:string)=>Promise<string>=async()
  }
  return {
   active:ensure,
+  activateEmptyDraft:async()=>{
+   const id=crypto.randomUUID()
+   await io.setMany([['canvas-project-doc:'+id,{format:'visproj',schemaVersion:1,name:'未命名画布',nodes:[],edges:[],viewport:{x:0,y:0,zoom:1}}],[activeKey,id]])
+   active=id;return id
+  },
   read:async()=>store(await ensure()).read(),
   write:async(doc:unknown)=>save(await ensure(),doc as Doc),
   list:async()=>{
@@ -56,6 +61,22 @@ export function projectCatalog(io:IO,cover:(src:string)=>Promise<string>=async()
   open:async(id:string)=>{const meta=await io.get(prefix+id) as ProjectSummary;if(!meta||meta.deletedAt)throw Error('项目不存在或已删除');await io.setMany([[activeKey,id]]);active=id},
   rename:async(id:string,name:string)=>{if(!name.trim())throw Error('请输入项目名称');const doc=await store(id).read() as Doc;await save(id,{...doc,name:name.trim().slice(0,100)})},
   duplicate:async(id:string)=>{const doc=await store(id).read() as Doc;const next=crypto.randomUUID();await save(next,{...doc,name:doc.name+' · 副本'});return next},
-  trash:async(id:string,deleted:boolean)=>{if(deleted&&id===await ensure())throw Error('请先打开其他画布，再删除当前项目');const meta=await io.get(prefix+id) as ProjectSummary;if(!meta)throw Error('项目不存在');await io.setMany([[prefix+id,{...meta,deletedAt:deleted?Date.now():undefined}]])}
+  purge:async(ids:string[])=>{
+   const targets=[...new Set(ids)];if(!targets.length)return
+   const current=await ensure()
+   const items=await io.getMany(targets.map(id=>prefix+id)) as (ProjectSummary|undefined)[]
+   if(targets.includes(current)||items.some(meta=>!meta?.deletedAt))throw Error('只能彻底删除回收站中的项目')
+   // Images can be shared with other documents/backups; retain their asset records.
+   await io.delMany(targets.flatMap(id=>[prefix+id,'canvas-project-doc:'+id]))
+   targets.forEach(id=>{stores.delete(id);metadata.delete(id)})
+  },
+  trash:async(id:string,deleted:boolean)=>{if(deleted&&id===await ensure())throw Error('请先打开其他画布，再删除当前项目');const meta=await io.get(prefix+id) as ProjectSummary;if(!meta)throw Error('项目不存在');if(deleted){
+    const doc=await store(id).read() as Doc|undefined
+    const draft=doc?.draft as {prompt?:string;referenceIds?:unknown[]}|undefined
+    if(doc&&Array.isArray(doc.nodes)&&doc.nodes.length===0&&Array.isArray(doc.edges)&&doc.edges.length===0&&!draft?.prompt?.trim()&&!draft?.referenceIds?.length){
+     await io.delMany([prefix+id,'canvas-project-doc:'+id]);stores.delete(id);metadata.delete(id);return
+    }
+   }
+   await io.setMany([[prefix+id,{...meta,deletedAt:deleted?Date.now():undefined}]])}
  }
 }

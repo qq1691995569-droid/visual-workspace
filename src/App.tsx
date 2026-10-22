@@ -31,7 +31,7 @@ import { refinementPrompt, styleRefinementBody } from './refinement'
 import { graphCommand, applyGraphCommand, type GraphCommand } from './graphHistory'
 import { ResultDock } from './ResultDock'
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, memo, createContext, useContext } from 'react'
-import { ReactFlow, ReactFlowProvider, Controls, MiniMap, Position, SelectionMode, NodeResizer, useNodesState, useEdgesState, useReactFlow, useStore, useUpdateNodeInternals, addEdge, reconnectEdge, type Node, type NodeProps, type Edge, type Viewport } from '@xyflow/react'
+import { getViewportForBounds, ReactFlow, ReactFlowProvider, Controls, MiniMap, Position, SelectionMode, NodeResizer, useNodesState, useEdgesState, useReactFlow, useStore, useUpdateNodeInternals, addEdge, reconnectEdge, type Node, type NodeProps, type Edge, type Viewport } from '@xyflow/react'
 import { readCanvasProject, writeCanvasProject, canvasProjects, readCanvasBackup } from './canvasStorage'
 import { Undo2, Redo2, Archive, Upload, Download, Layers, WandSparkles, Plus, X, ImagePlus, Palette, Sun, Armchair, Maximize, Scan, FolderOpen, Columns2, Check, ChevronDown, ChevronUp, Group, Ungroup, GripHorizontal, MousePointer2, Map, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
 import '@xyflow/react/dist/style.css'
@@ -226,7 +226,8 @@ function Workspace() {
   const referenceUpload = useRef(false)
   const draggedReference = useRef<number | null>(null)
   const [directComposerInput, setDirectComposerInput] = useState<string | null>(null)
-  const [projectsOpen,setProjectsOpen]=useState(false)
+  const [projectsOpen,setProjectsOpen]=useState(()=>sessionStorage.getItem('canvas-return-projects')==='1')
+  useEffect(()=>{sessionStorage.removeItem('canvas-return-projects')},[])
   const [saveStatus, setSaveStatus] = useState('正在读取')
   const persistenceAllowed=useRef(false),hydrationFlow=useRef(flow)
   const [projectWriter]=useState(()=>latestProjectWriter<Project>(p=>writeCanvasProject(p),state=>setSaveStatus(state==='saved'?'已保存在此浏览器':state==='saving'?'正在保存':'保存失败，请导出备份')))
@@ -580,6 +581,22 @@ function Workspace() {
       return [...next, ...missing.map((result, index) => ({ ...result, position: { x: at.x + index * 380, y: at.y } }))]
     })
   }
+  function locateLayer(id:string){
+    const ancestors=new Set<string>();let parent=nodes.find(n=>n.id===id)?.parentId
+    while(parent&&!ancestors.has(parent)){ancestors.add(parent);parent=nodes.find(n=>n.id===parent)?.parentId}
+    const next=fitGroupNodes(nodes.map(n=>{
+      if(!ancestors.has(n.id)||!n.data.collapsed)return {...n,selected:n.id===id}
+      const size=n.data.expandedSize||{width:500,height:400}
+      return {...n,selected:false,width:size.width,height:size.height,style:{...n.style,width:size.width,height:size.height},data:{...n.data,collapsed:false}}
+    }))
+    const target=next.find(n=>n.id===id);if(!target)return
+    setNodes(next)
+    const position=absolutePosition(id,next)
+    // Use graph coordinates, including parent offsets, even before an offscreen node is mounted.
+    const surface=document.querySelector('.canvas-surface .react-flow')?.getBoundingClientRect();if(!surface)return
+    const viewport=getViewportForBounds({...position,width:Number(target.style?.width)||target.measured?.width||340,height:Number(target.style?.height)||target.measured?.height||420},surface.width,surface.height,.15,1,.3)
+    void flow.setViewport(viewport,{duration:300})
+  }
   function toggleNode(id: string) {
     setNodes(ns => {const expanding=ns.find(n=>n.id===id)?.data.collapsed;const next=ns.map(n => {
       if (n.id !== id) return n
@@ -901,9 +918,9 @@ function Workspace() {
   async function deleteManagedProject(id:string){
     if(!await projectWriter.flush())throw Error('当前画布保存失败，未删除项目')
     if(id!==await canvasProjects.active()){await canvasProjects.trash(id,true);return}
-    const replacement=await canvasProjects.create()
+    const replacement=(await canvasProjects.list()).filter(p=>p.id!==id&&!p.deletedAt).sort((a,b)=>b.updatedAt-a.updatedAt)[0]?.id
     persistenceAllowed.current=false
-    try{await canvasProjects.open(replacement);await canvasProjects.trash(id,true);window.location.reload()}catch(error){await canvasProjects.open(id);persistenceAllowed.current=true;throw error}
+    try{if(replacement)await canvasProjects.open(replacement);else await canvasProjects.activateEmptyDraft();await canvasProjects.trash(id,true);sessionStorage.setItem('canvas-return-projects','1');window.location.reload()}catch(error){await canvasProjects.open(id);persistenceAllowed.current=true;throw error}
   }
   async function newCanvas(){
     if(!await projectWriter.flush())throw Error('当前画布保存失败，未新建项目')
@@ -955,7 +972,7 @@ function Workspace() {
     confirmEdit:(parameters:InlineParameters)=>{const h=actionRef.current;if(h.editing)h.createQuickTask(h.editing.operation,h.editing.id,parameters)},
     select:(id:string)=>setNodes(ns=>ns.map(n=>n.id===id?{...n,selected:!n.selected}:n))
   }),[editing,setNodes])
-  return <Actions.Provider value={actions}>{projectsOpen&&<ProjectManager onClose={()=>setProjectsOpen(false)} onCreate={newCanvas} onDelete={deleteManagedProject} onOpen={openManagedProject} onImport={()=>open.current?.click()} onBackup={()=>void exportCanvasBackup()}/>}<div className={assetSession?.mode==='browse'?'app-shell asset-browser-open':'app-shell'}>
+  return <Actions.Provider value={actions}>{projectsOpen&&<ProjectManager onRename={setName} onClose={()=>setProjectsOpen(false)} onCreate={newCanvas} onDelete={deleteManagedProject} onOpen={openManagedProject} onImport={()=>open.current?.click()} onBackup={()=>void exportCanvasBackup()}/>}<div className={assetSession?.mode==='browse'?'app-shell asset-browser-open':'app-shell'}>
     <div hidden aria-hidden="true">{[...new globalThis.Map(nodes.filter(n=>n.data.extraction&&!['complete','paused'].includes(n.data.extraction.status)).map(n=>[n.data.extraction!.id,n.data.extraction!])).values()].map(task=><ExtractionMonitor key={task.id} id={task.id} kind={task.kind} onState={state=>extractionState(state)}/>)}</div>
     <div hidden aria-hidden="true">{orphanedJobs.map(p => <ImageJob key={p.jobId} endpoint={p.endpoint || (nodes.find(n => n.id === p.sourceNode)?.data.tool === 'style' ? 'style' : 'images')} job={p.task || { id: p.jobId, status: 'restoring', message: '正在恢复任务状态' }} onChange={task => setNodes(current => current.map(n => n.data.pendingResult?.jobId === p.jobId ? { ...n, data: { ...n.data, pendingResult: { ...n.data.pendingResult!, task } } } : n))} onResults={(job, images) => skillResults(p.sourceNode, job, images)} />)}</div>
     <div hidden aria-hidden="true">{nodes.map(n => <div key={n.id}>{['style','light'].includes(n.data.tool||'') && n.data.skillState?.jobId && <ImageJob endpoint={n.data.tool==='light'?'images':'style'} job={{ ...n.data.skillState, id: n.data.skillState.jobId, status: n.data.skillState.status || 'running', message: n.data.skillState.message || '' }} onChange={job => update(n.id, { skillState: { ...n.data.skillState, ...job, jobId: job.id } })} onResults={(job, images) => skillResults(n.id, job, images)} />}{n.data.imageJob && <ImageJob submitting={submittingIds.has(n.id)||(['platform-upscale','texture-restore'].includes(n.data.tool||'')&&n.data.imageJob?.status==='submitting')} job={n.data.imageJob} onChange={imageJob => update(n.id, { imageJob })} onResults={(job, images) => skillResults(n.id, job, images)} />}</div>)}</div>
@@ -970,7 +987,7 @@ function Workspace() {
       <button aria-label="预览选中图片" title="预览选中图片 · 双击图片" disabled={selected?.data.kind !== 'image' || !!selected?.data.task || !!selected?.data.imageJob && !selected.data.imageOutput} onClick={() => selected && setPreviewId(selected.id)}><Eye size={18} /></button>
       <button aria-label="切换缩略地图" aria-pressed={showMinimap} title="缩略地图" onClick={() => setShowMinimap(v => !v)}><Map size={17} /></button>
     </nav>
-    <aside className={panelOpen ? '' : 'collapsed'} inert={!panelOpen}><div className="tabs"><button className="current">图层 <small>{nodes.length - legacyGeneratorIds.size}</small></button></div><div className="layer-list">{nodes.length === 0 && <p>导入图片后，图层会显示在这里。</p>}{nodes.filter(n => !legacyGeneratorIds.has(n.id)).map(n => <button className={n.selected ? 'chosen' : ''} key={n.id} onClick={() => { setNodes(ns => ns.map(item => ({ ...item, selected: item.id === n.id }))); void flow.fitView({ nodes: [{ id: n.id }], maxZoom: 1, duration: 300 }) }}>{n.data.kind === 'group' ? <Group size={15} /> : <ImagePlus size={15} />}<span>{n.parentId ? '↳ ' : ''}{n.data.label}</span>{n.data.final && <Check size={14} />}</button>)}</div><div className="sidebar-bottom">本地工作空间 <span>●</span></div></aside>
+    <aside className={panelOpen ? '' : 'collapsed'} inert={!panelOpen}><div className="tabs"><button className="current">图层 <small>{nodes.length - legacyGeneratorIds.size}</small></button></div><div className="layer-list">{nodes.length === 0 && <p>导入图片后，图层会显示在这里。</p>}{nodes.filter(n => !legacyGeneratorIds.has(n.id)).map(n => <button className={n.selected ? 'chosen' : ''} key={n.id} onClick={() => locateLayer(n.id)}>{n.data.kind === 'group' ? <Group size={15} /> : <ImagePlus size={15} />}<span>{n.parentId ? '↳ ' : ''}{n.data.label}</span>{n.data.final && <Check size={14} />}</button>)}</div><div className="sidebar-bottom">本地工作空间 <span>●</span></div></aside>
     <main className={`canvas-surface${middlePanning ? ' middle-panning' : ''}${editing ? ' canvas-editing' : ''}`} onMouseDownCapture={e => { if (e.button === 1 && (e.target as HTMLElement).closest('.react-flow')) { e.preventDefault(); setMiddlePanning(true) } }} onAuxClickCapture={e => { if (e.button === 1) e.preventDefault() }} onDragEnter={e => { if (e.dataTransfer.types.includes('Files')) { dragDepth.current++; setDraggingFile(true) } }} onDragLeave={() => { dragDepth.current = Math.max(0, dragDepth.current - 1); if (!dragDepth.current) setDraggingFile(false) }} onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }} onDrop={e => { e.preventDefault(); dragDepth.current = 0; setDraggingFile(false); void importImages(e.dataTransfer.files, flow.screenToFlowPosition({ x: e.clientX, y: e.clientY })) }}>
       <div className="canvas-heading"><span>画布 01</span><span> / </span><small>自由创作</small></div>
       {ready && <ReactFlow elevateEdgesOnSelect={false} onlyRenderVisibleElements onNodeClick={(event, node) => { if (node.data.pendingResult && !event.ctrlKey && !event.metaKey && !event.shiftKey) restoreComposer(node as Card); if(node.data.canvasImageNode){setEditorMode('free');setComposerOpen(true)} if (node.data.kind === 'image' && node.data.src && !node.data.pendingResult && !node.data.task && (!node.data.imageJob || node.data.imageOutput)) { setDirectComposerInput(node.id); if (!event.ctrlKey && !event.metaKey && !event.shiftKey) restoreComposer(node as Card); if(event.ctrlKey || event.metaKey){setEditorMode('free');addComposerReferences([node as Card])} } else { setDirectComposerInput(null) } }} onBeforeDelete={async({nodes:removed,edges:removedEdges})=>{

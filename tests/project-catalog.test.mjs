@@ -15,7 +15,7 @@ test('项目迁移、独立保存、复制、回收站和重启恢复',async()=>
   const {projectCatalog}=await import(pathToFileURL(path.join(dir,'projectCatalog.mjs')).href)
   const db=new Map(),clone=v=>v===undefined?v:structuredClone(v)
   let fail=false
-  const io={get:async k=>clone(db.get(k)),getMany:async keys=>keys.map(k=>clone(db.get(k))),keys:async()=>[...db.keys()],setMany:async entries=>{if(fail)throw Error('disk full');entries.forEach(([k,v])=>db.set(k,clone(v)))}}
+  const io={delMany:async keys=>{if(fail)throw Error('disk full');keys.forEach(k=>db.delete(k))},get:async k=>clone(db.get(k)),getMany:async keys=>keys.map(k=>clone(db.get(k))),keys:async()=>[...db.keys()],setMany:async entries=>{if(fail)throw Error('disk full');entries.forEach(([k,v])=>db.set(k,clone(v)))}}
   const doc={format:'visproj',schemaVersion:1,name:'旧画布',nodes:[{data:{kind:'image',src:'data:image/png;base64,test'}}],edges:[],viewport:{x:20,y:30,zoom:.5},draft:{prompt:'原提示词'}}
   db.set('visual-canvas-project',doc)
   const catalog=projectCatalog(io,async()=> 'thumb')
@@ -40,8 +40,22 @@ test('项目迁移、独立保存、复制、回收站和重启恢复',async()=>
   assert.equal((await catalog.read()).nodes[0].data.src,doc.nodes[0].data.src)
   const reopened=projectCatalog(io);assert.equal(await reopened.active(),copied);assert.equal((await reopened.read()).name,'副本')
   await assert.rejects(()=>catalog.trash(copied,true),/当前项目/)
-  fail=true;await assert.rejects(()=>catalog.rename(old,'写入失败'));fail=false
-  assert.equal((await catalog.list()).find(p=>p.id===old).name,'保存后的画布')
+  await assert.rejects(()=>catalog.purge([copied]),/回收站/)
+  await assert.rejects(()=>catalog.purge([old]),/回收站/)
+  await catalog.trash(old,true)
+  fail=true;await assert.rejects(()=>catalog.purge([old]));fail=false
+  assert.ok(db.has('canvas-project-doc:'+old))
+  await catalog.purge([old])
+  assert.equal(db.has('canvas-project-doc:'+old),false)
+  assert.equal((await catalog.list()).some(p=>p.id===old),false)
+  assert.equal((await catalog.read()).nodes[0].data.src,doc.nodes[0].data.src)
+  const empty=await catalog.create();await catalog.trash(empty,true)
+  assert.equal(db.has('canvas-project-meta:'+empty),false,'空白项目不进入回收站')
+  const draft=await catalog.create({name:'草稿',nodes:[],edges:[],draft:{prompt:'保留提示词'}})
+  await catalog.trash(draft,true)
+  assert.ok((await catalog.list()).find(p=>p.id===draft)?.deletedAt,'提示词草稿进入回收站')
+  fail=true;await assert.rejects(()=>catalog.rename(second,'写入失败'));fail=false
+  assert.equal((await catalog.list()).find(p=>p.id===second).name,'第二张画布')
   assert.deepEqual(db.get('visual-canvas-project'),doc,'保留迁移前的原记录')
  }finally{assert.equal(path.dirname(path.resolve(dir)),path.resolve(tmpdir()));assert.ok(path.basename(dir).startsWith('canvas-catalog-'));await rm(dir,{recursive:true,force:true})}
 })

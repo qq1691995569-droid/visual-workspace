@@ -3,3 +3,66 @@
 .project-manager-shell{max-width:1500px;margin:auto;padding:28px 48px 40px}.project-manager nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:30px}.pm-brand{display:flex;align-items:center;gap:12px;font-size:12px;letter-spacing:2px;font-weight:600;color:light-dark(#778aa0, #b7c0ce)}.pm-hero{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(115deg,light-dark(#fff, #242830),light-dark(#edf4fd, #1e2229));border:1px solid light-dark(white, #3b424e);border-radius:24px;padding:38px 40px;margin-bottom:32px}.pm-eyebrow{font-size:11px;letter-spacing:2px;color:light-dark(#8b9eb5, #b7c0ce)}.pm-hero h1{font-size:32px;letter-spacing:-1px;margin:8px 0}.pm-hero p,.pm-library-heading p{margin:4px 0;color:light-dark(#8b99a9, #b7c0ce)}.pm-stats{display:flex;gap:14px;margin-top:20px;font-size:12px;color:light-dark(#8b99a9, #b7c0ce)}.project-manager .pm-primary{background:#3685ed;border-color:#3685ed;color:white;padding:12px 22px;box-shadow:0 4px 12px light-dark(#3685ed20, #00000020)}.project-manager .pm-primary:hover:not(:disabled){background:#2774d7;color:white}.pm-library-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}.pm-library-heading h2{font-size:20px;margin:0 0 5px}.pm-tools{display:flex;gap:12px;margin-bottom:26px}.pm-tools label{display:flex;align-items:center;gap:10px;padding:0 14px;background:light-dark(white, #242830);border:1px solid light-dark(#e1e7ef, #3b424e);border-radius:11px;max-width:520px;flex:1;color:light-dark(#93a3b5, #b7c0ce)}.pm-tools input{width:100%;padding:12px 0;border:0;background:transparent;outline:0;color:light-dark(#273a51, #e3e7ee)}.pm-tools :is(select,.canvas-select){padding:10px 15px;background:light-dark(white, #242830);border:1px solid light-dark(#e1e7ef, #3b424e);border-radius:10px;color:light-dark(#53677e, #e3e7ee)}
 .pm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(245px,1fr));gap:24px}.pm-card{position:relative;background:light-dark(white, #242830);border:1px solid light-dark(#e3e8ef, #3b424e);border-radius:17px;box-shadow:0 2px 4px light-dark(#24354d03, #00000003);transition:box-shadow .18s,transform .18s}.pm-card:hover{box-shadow:0 8px 25px light-dark(#24354d0c, #0000000c);transform:translateY(-2px)}.project-manager .pm-cover{position:relative;display:flex;width:100%;aspect-ratio:1.55;padding:0;overflow:hidden;border:0;border-radius:16px 16px 0 0;background:light-dark(#eaf0f6, #1e2229)}.pm-cover img{width:100%;height:100%;object-fit:cover}.pm-cover>span{display:grid;justify-items:center;gap:10px;color:light-dark(#a2b3c7, #929eaf);font-size:12px}.pm-cover b{position:absolute;top:12px;left:12px;background:light-dark(#ffffffeb, #242830eb);padding:4px 9px;border-radius:6px;color:light-dark(#3978ba, rgb(112 175 226));font-size:11px;font-weight:500}.pm-card-body{position:relative;padding:16px 18px}.pm-card-title{display:flex;align-items:center;gap:6px;justify-content:space-between}.project-manager .pm-card-title button{border:0;background:none;padding:2px 0;border-radius:4px;text-align:left;color:light-dark(#30445c, #e3e7ee)}.pm-card-title button:first-child{font-size:14px;font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.pm-card-meta{display:flex;justify-content:space-between;color:light-dark(#96a3b2, #b7c0ce);font-size:11px;margin-top:12px}.pm-card-menu{position:absolute;right:15px;top:42px;z-index:5;min-width:150px;padding:6px;background:light-dark(white, #242830);border:1px solid light-dark(#e3e8ef, #3b424e);box-shadow:0 8px 25px light-dark(#263a551a, #0000001a);border-radius:10px}.project-manager .pm-card-menu button{border:0;width:100%;justify-content:flex-start;font-size:12px;padding:9px 12px}.project-manager .pm-danger{color:light-dark(#c65b66, rgb(253 146 142))}.project-manager .pm-create-tile{min-height:250px;display:flex;flex-direction:column;border:1px dashed light-dark(#ccd9e8, #3b424e);border-radius:17px;background:linear-gradient(150deg,light-dark(#f8fbff, #242830),light-dark(#edf3fb, #1e2229));color:light-dark(#7894b3, #b7c0ce);gap:14px}.pm-create-tile>span{display:grid;place-items:center;width:52px;height:52px;border-radius:15px;background:light-dark(white, #242830);box-shadow:0 3px 10px light-dark(#476c9810, #00000010)}.pm-create-tile strong{font-size:15px;color:light-dark(#587698, #b7c0ce)}.pm-create-tile small{color:light-dark(#9aabba, #b7c0ce)}.pm-error{padding:12px 16px;margin-bottom:20px;border-radius:10px;background:light-dark(#fff0ef, #1e2229);color:light-dark(#ac5656, rgb(227 141 126))}.pm-empty{padding:70px;text-align:center;color:light-dark(#92a1b3, #b7c0ce)}.project-manager footer{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:36px;color:light-dark(#a0adbd, #b7c0ce);font-size:12px}.project-manager footer button{background:none;border:none;font-size:12px;color:light-dark(#8b9eb5, #b7c0ce)}.pm-rename{position:fixed;inset:0;z-index:10;background:#273b5550;display:grid;place-items:center;backdrop-filter:blur(5px)}.pm-rename form{width:380px;max-width:90vw;padding:26px;background:light-dark(white, #242830);border-radius:18px}.pm-rename form>div{display:flex;align-items:center;justify-content:space-between}.pm-rename h2{font-size:18px}.pm-rename input{width:100%;padding:12px;border:1px solid light-dark(#d5e0ee, #3b424e);border-radius:8px;margin:16px 0 22px}.pm-rename .pm-primary{width:100%}
 @media(max-width:800px){.project-manager-shell{padding:20px}.pm-hero{padding:24px;gap:24px;flex-wrap:wrap}.pm-hero h1{font-size:26px}.pm-stats{flex-wrap:wrap}.pm-tools{flex-wrap:wrap}.pm-tools label{min-width:100%}.pm-grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}.project-manager footer{flex-wrap:wrap}}
+/* Project identity: quiet current-state badge and direct inline renaming. */
+.project-manager .pm-card-current{border-color:color-mix(in srgb,var(--ui-accent) 35%,var(--ui-border))}
+.project-manager .pm-card-editing{transform:none;border-color:var(--ui-accent)}
+.project-manager .pm-cover>.pm-current-badge{position:absolute;top:12px;left:12px;display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:9px;border:1px solid color-mix(in srgb,var(--ui-accent) 24%,var(--ui-border));background:color-mix(in srgb,var(--ui-panel) 94%,transparent);color:var(--ui-accent);box-shadow:var(--ui-shadow);font-size:11px;font-weight:600;line-height:1.4;backdrop-filter:blur(10px);pointer-events:none}
+.project-manager .pm-card-title{min-height:36px;gap:10px}
+.project-manager .pm-card-title .pm-project-title{flex:1;color:var(--ui-ink);box-shadow:none;background:transparent;font-size:14px;font-weight:600}
+.project-manager .pm-card-title .pm-rename-trigger{width:32px;height:32px;flex:none;display:grid;place-items:center;padding:0;border:1px solid transparent;border-radius:10px;background:var(--ui-field);color:var(--ui-secondary);box-shadow:none;transition:background .15s,color .15s,border-color .15s}
+.project-manager .pm-card-title .pm-rename-trigger:hover{color:var(--ui-accent);background:var(--ui-selected);border-color:color-mix(in srgb,var(--ui-accent) 25%,var(--ui-border))}
+.project-manager .pm-inline-rename{width:100%;margin:0}
+.project-manager .pm-inline-rename input{display:block;width:100%;height:36px;padding:7px 10px;border:1px solid var(--ui-accent);border-radius:10px;background:var(--ui-field);color:var(--ui-ink);font:inherit;font-weight:500;box-shadow:0 0 0 3px color-mix(in srgb,var(--ui-accent) 14%,transparent);outline:none;outline-offset:0}
+.project-manager .pm-card-meta{align-items:center;gap:8px;margin-top:8px;min-height:26px;color:var(--ui-muted)}
+.project-manager .pm-card-meta time{margin-left:auto}
+.project-manager .pm-more-trigger{width:24px;height:24px;padding:0;border:0;border-radius:7px;box-shadow:none;background:transparent;color:var(--ui-secondary)}
+.project-manager .pm-card-menu{top:calc(100% - 6px)}
+@media(prefers-reduced-motion:reduce){.project-manager .pm-rename-trigger{transition:none}}
+/* Preserve card height while giving the preview the excess title whitespace. */
+.project-manager .pm-card{container-type:inline-size}
+.project-manager .pm-card .pm-cover{width:calc(100% - 16px);height:calc(100cqw / 1.55 + 22px);aspect-ratio:auto;margin:8px 8px 0;flex-shrink:0}
+.project-manager .pm-card-body{padding:8px 18px 16px}
+.project-manager .pm-card-title .pm-project-title{font-size:14px;line-height:20px;font-weight:650;letter-spacing:.1px}
+.project-manager .pm-card-meta{font-size:11px;line-height:16px;font-variant-numeric:tabular-nums}
+.project-manager .pm-cover>.pm-current-badge{color:var(--ui-secondary);font-weight:500;border-color:var(--ui-border)}
+/* One clear page heading, followed by a compact library toolbar. */
+.project-manager nav{margin-bottom:24px}
+.project-manager .pm-hero{padding:8px 0 24px;margin-bottom:20px;border-bottom:1px solid var(--ui-border);border-radius:0;gap:20px}
+.project-manager .pm-hero h1{font-size:28px;line-height:1.3;letter-spacing:-.5px;margin:0;color:var(--ui-ink);font-weight:700}
+.project-manager .pm-stats{margin-top:10px;gap:10px;font-size:12px;line-height:18px;color:var(--ui-muted)}
+.project-manager .pm-library-heading{margin-bottom:12px;min-height:36px}
+.project-manager .pm-library-heading h2{font-size:15px;line-height:22px;font-weight:600;margin:0;color:var(--ui-secondary)}
+.project-manager .pm-library-heading>button{padding:7px 12px;font-size:12px;box-shadow:none;background:transparent;color:var(--ui-secondary)}
+.project-manager .pm-tools{margin-bottom:20px}
+.project-manager .pm-tools>button{min-height:44px;padding:10px 15px;border:1px solid var(--ui-border);border-radius:20px;background:var(--ui-panel);color:var(--ui-secondary);box-shadow:var(--ui-pill-shadow);font-size:14px}
+.project-manager .pm-tools>button:hover:not(:disabled){background:var(--ui-field);border-color:var(--ui-border)}
+.project-manager .pm-tools>button:focus-visible{outline:2px solid var(--ui-accent);outline-offset:3px}
+.project-manager .pm-card-meta{margin-top:2px}
+.project-manager .project-manager-shell{min-height:100dvh;display:flex;flex-direction:column}
+.project-manager .project-manager-shell>footer{margin-top:auto;padding-top:36px;flex-shrink:0}
+.project-manager .pm-card-meta{gap:8px;white-space:nowrap}
+.project-manager .pm-card-meta time{margin-left:0}
+.project-manager .pm-card-actions{display:flex;align-items:center;gap:2px;margin-left:auto}
+.project-manager .pm-card-actions>button{width:24px;height:24px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--ui-secondary);box-shadow:none}
+.project-manager .pm-card-actions>button:hover{background:var(--ui-field)}
+.project-manager .pm-card-menu{top:auto;bottom:46px;right:12px;background:var(--ui-panel);border-color:var(--ui-border);box-shadow:var(--ui-shadow);border-radius:12px}
+.project-manager .pm-card-menu button{background:transparent;box-shadow:none;border-radius:8px;color:var(--ui-secondary)}
+.project-manager .pm-card-menu button:hover{background:var(--ui-field)}
+.project-manager .pm-card-menu .pm-danger{color:var(--ui-ink)}
+.project-manager .pm-tools{flex-wrap:wrap}
+.project-manager .pm-tools>button[aria-pressed=true]{background:var(--ui-selected);color:var(--ui-accent);border-color:var(--ui-accent)}
+.project-manager .pm-batch-bar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:0 0 20px;padding:10px 14px;border:1px solid var(--ui-border);border-radius:16px;background:var(--ui-panel);color:var(--ui-secondary);font-size:13px}
+.project-manager .pm-batch-bar label{display:flex;align-items:center;gap:8px;cursor:pointer}
+.project-manager .pm-batch-bar>button{padding:7px 12px;font-size:12px;box-shadow:none}
+.project-manager .pm-batch-bar>button:first-of-type{margin-left:auto}
+.project-manager .pm-batch-bar input,.project-manager .pm-project-check input{width:16px;height:16px;margin:0;accent-color:var(--ui-accent);cursor:pointer}
+.project-manager .pm-project-check{position:absolute;top:18px;right:18px;z-index:2;display:grid;place-items:center;width:28px;height:28px;border:1px solid var(--ui-border);border-radius:8px;background:var(--ui-panel);box-shadow:var(--ui-shadow);cursor:pointer}
+.project-manager .pm-card.pm-card-picked{border-color:var(--ui-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--ui-accent) 22%,transparent),var(--ui-shadow)}
+.project-manager .pm-card-actions[hidden]{display:none}
+.project-manager .pm-card-meta{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px}
+.project-manager .pm-card-meta>span{text-align:right;grid-column:2}
+.project-manager .pm-cover-action{position:absolute;top:18px;right:18px;z-index:2;width:28px;height:28px;padding:0;border:1px solid var(--ui-border);border-radius:8px;background:var(--ui-panel);color:var(--ui-secondary);box-shadow:var(--ui-shadow);opacity:0;pointer-events:none;transition:opacity .15s}
+.project-manager .pm-card:hover .pm-cover-action,.project-manager .pm-card:focus-within .pm-cover-action{opacity:1;pointer-events:auto}
+.project-manager .pm-cover-action:hover{background:var(--ui-field);color:var(--ui-ink)}
+@media(hover:none){.project-manager .pm-cover-action{opacity:1;pointer-events:auto}}
+@media(prefers-reduced-motion:reduce){.project-manager .pm-cover-action{transition:none}}
