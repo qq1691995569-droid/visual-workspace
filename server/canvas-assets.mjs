@@ -1,3 +1,4 @@
+import {configuredText,personaText} from './function-config.mjs'
 import { createHash } from 'node:crypto'
 import { mkdir, readdir, readFile, unlink, stat } from 'node:fs/promises'
 import path from 'node:path'
@@ -106,6 +107,7 @@ export function localEditPlan(edit) {
   const plan = legacyLocalEditPlan(edit)
   if (edit.kind === 'model') return modelReplacementPlan(plan,edit)
   if (edit.kind !== 'material') return plan
+  plan.managedInstructions=[personaText('material'),configuredText('material','')].filter(Boolean).join('\n')
   plan.schemaVersion = 3
   plan.ruleVersion = 'material-prompt-first-v3'
   const inputs = edit.regions || [edit], outputs = plan.regions || [plan]

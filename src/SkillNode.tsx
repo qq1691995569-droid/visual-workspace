@@ -1,7 +1,8 @@
+import {useFunctionEnabled} from './functionFlags'
 import { CanvasSelect } from './CanvasSelect'
 import type { ToneSettings } from './ToneSkillNode'
 import {LightingControls,type LightingSettings} from './LightingControls'
-import { TaskTiming, type TaskTimingState } from './TaskTiming'
+import { type TaskTimingState } from './TaskTiming'
 import { useEffect, useState } from 'react'
 import { Play, X, MousePointer2, Pencil } from 'lucide-react'
 import './SkillNode.css'
@@ -35,6 +36,7 @@ function moduleWheel(event:React.WheelEvent<HTMLElement>){
   }
 }
 export function SkillNode({ tool, inputs, state, onChange, onAssetEdit, localEdit, onLocalRun, localBusy, localAttention }: { tool: string; inputs: SkillInput[]; state: SkillState; onChange: (value: SkillState) => void; onResults: (job: string, results: SkillResult[]) => void; onAssetEdit?: (baseId:string)=>void; localEdit?:LocalEditRecipe; onLocalRun?:()=>void; localBusy?:boolean; localAttention?:boolean }) {
+  const enabled=useFunctionEnabled()(tool)
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
   const [models, setModels] = useState<Model[]>([])
   const uniqueInputs = inputs.filter((input, index) => inputs.findIndex(other => other.id === input.id) === index)
@@ -43,7 +45,7 @@ export function SkillNode({ tool, inputs, state, onChange, onAssetEdit, localEdi
   const options = { ...defaultOptions, ...state.options }
   const model = models.find(model => model.model === options.model)
   const running = !!state.jobId && !['complete','paused'].includes(state.status || '')
-  const locked = busy || running
+  const locked = !enabled || busy || running
   useEffect(() => {
     let active = true
     api<{models: Model[]}>('/api/skills/status').then(result => { if (active) setModels(result.models) }).catch(() => { if (active) setError('本地功能服务不可用') })
@@ -68,7 +70,7 @@ export function SkillNode({ tool, inputs, state, onChange, onAssetEdit, localEdi
     } catch (cause) { setError(cause instanceof Error ? cause.message : '功能执行失败') }
     finally { setBusy(false) }
   }
-  if (['material','furniture'].includes(tool)) return <fieldset disabled={localBusy} style={{border:0,margin:0,minWidth:0}} className="skill-body compact-skill nopan" onWheelCapture={moduleWheel}>
+  if (['material','furniture'].includes(tool)) return <fieldset disabled={localBusy||!enabled} style={{border:0,margin:0,minWidth:0}} className="skill-body compact-skill nopan" onWheelCapture={moduleWheel}>
     <div className="skill-input-row"><div className="skill-field-label">底图</div><div className="skill-input-surface">{base ? <><img draggable={false} className="skill-thumbnail" src={base.previewSrc || base.src} alt={base.label}/><span className="asset-binding-label" title={base.label}>{base.label}</span></> : <small>请连接一张底图</small>}</div></div>
     <div className="skill-binding-field">
       <div className="skill-binding-heading"><span>{tool==='material'?'材质':'模型'}</span><button type="button" className="nodrag nopan skill-binding-edit" disabled={!base} onClick={()=>base&&onAssetEdit?.(base.id)}>{localEdit?<><Pencil size={11}/> 编辑</>:<><MousePointer2 size={12}/> 选择</>}</button></div>
@@ -89,6 +91,6 @@ export function SkillNode({ tool, inputs, state, onChange, onAssetEdit, localEdi
     <div className="skill-public-options"><label>生图模型<CanvasSelect className="nodrag nopan" aria-label="功能生图模型" value={options.model} disabled={locked} onChange={e => chooseModel(e.target.value)}>{!models.some(model => model.model === options.model) && <option value={options.model}>Seedream 5.0 Pro</option>}{models.map(model => <option key={model.model} value={model.model}>{model.display_name || model.model}</option>)}</CanvasSelect></label><div><label>画质<CanvasSelect className="nodrag nopan" aria-label="功能分辨率" value={options.resolution} disabled={locked} onChange={e => changeOptions({ ...options, resolution: e.target.value })}>{(model?.supported_resolutions || ['2K']).filter(r => ['1K','2K','4K'].includes(r)).map(r => <option key={r}>{r}</option>)}</CanvasSelect></label><label>尺寸比例<CanvasSelect className="nodrag nopan" aria-label="功能尺寸比例" value={options.ratio} disabled={locked} onChange={e => changeOptions({ ...options, ratio: e.target.value })}><option value="auto">沿用原图</option>{(model?.supported_aspects || ['3:4','4:3','1:1','16:9','9:16']).filter(r => r !== 'auto' && r !== 'custom').map(r => <option key={r}>{r}</option>)}</CanvasSelect></label><label>张数<CanvasSelect className="nodrag nopan" aria-label="功能生成张数" value={options.count} disabled={locked} onChange={e => changeOptions({ ...options, count: Number(e.target.value) })}>{(model?.supported_counts || [1,2,3,4].filter(count => count <= (model?.max_images_per_call || 4))).filter(count => count <= 4).map(count => <option key={count} value={count}>{count} 张</option>)}</CanvasSelect></label></div></div>
     <small className="skill-hint" title="优先沿用原图比例；模型不支持时匹配相近比例。手动改比例可能改变构图。">比例自动适配，改比例需复核构图。</small><label className="skill-supplement">补充说明 <small>优先于内置规则</small><textarea className="nodrag nopan" aria-label="功能补充说明" disabled={locked} maxLength={5000} placeholder={tool==='light'?'例如：阳光偏暖一点，保留沙发原色，暗部不要太黑…':'可选，例如：沙发保持原色，只换墙面与地面…'} value={state.supplement || ''} onChange={e => onChange({ ...state, supplement: e.target.value, requestId: undefined })} /></label>
     <button className="nodrag nopan primary skill-run" disabled={locked || !['style','light'].includes(tool) || !base || tool === 'style' && (!references.length || references.length > 3)} onClick={() => void run()}><Play size={14} />{busy || running ? '正在处理…' : state.jobId ? '再次生成' : '生成图片'}</button>
-    {(error || state.jobId) && <div className={error ? 'skill-status error' : 'skill-status'} role="status">{error || state.message}<TaskTiming job={state} /></div>}
+    {error && <div className="skill-status error" role="status">{error}</div>}
   </div>
 }

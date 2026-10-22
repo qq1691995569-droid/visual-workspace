@@ -1,3 +1,4 @@
+import {useFunctionEnabled} from './functionFlags'
 import { useStore } from '@xyflow/react'
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
@@ -7,6 +8,7 @@ export function ImageToolbar({ anchor, revision, onAction, onDownload, onSaveAss
   anchor: RefObject<HTMLDivElement | null>; revision: string
   onAction: (operation: string) => void; onDownload: () => void; onSaveAsset?:()=>void; assetSaved?:boolean; onCompare?:()=>void
 }) {
+  const functionEnabled=useFunctionEnabled()
   const zoom=useStore(state=>state.transform[2])
   const scale=Math.max(.15,Math.min(1,zoom))
   const dragging=useStore(state=>state.nodes.some(node=>node.dragging))
@@ -46,7 +48,7 @@ export function ImageToolbar({ anchor, revision, onAction, onDownload, onSaveAss
   ]
   const commands = [
     ...(onCompare ? [{ id: 'compare', label: '滑块对比', icon: Columns2, run: onCompare }] : []),
-    ...actions.map(action => ({...action, run: () => onAction(action.id)})),
+    ...actions.filter(action=>functionEnabled(action.id)).map(action => ({...action, run: () => onAction(action.id)})),
     ...(onSaveAsset ? [{ id: 'save', label: assetSaved ? '已入库' : '保存资产', icon: Archive, run: onSaveAsset, disabled: assetSaved }] : []),
     { id: 'download', label: '下载原图', icon: Download, run: onDownload },
   ]

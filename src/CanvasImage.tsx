@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
-import { useStore } from '@xyflow/react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
+import { settledZoom, subscribeSettledZoom } from './settledViewport'
 import { acquireCanvasPreview } from './canvasPreviewCache'
 
 export function CanvasImage({ src, alt, width, height }: { src: string; alt: string; width: number; height: number }) {
   // Subscribe to resolution tiers, not every pan/zoom step.
-  const edge = useStore(state => {
-    const pixels = Math.max(width, height) * state.transform[2] * window.devicePixelRatio
+  const edge = useSyncExternalStore(subscribeSettledZoom, () => {
+    const pixels = Math.max(width, height) * settledZoom() * window.devicePixelRatio
     return [256, 512, 1024, 2048, 4096].find(size => size >= pixels) || 4096
   })
   const [preview, setPreview] = useState<{ src: string; url: string }>()
@@ -20,11 +20,12 @@ export function CanvasImage({ src, alt, width, height }: { src: string; alt: str
         try {
           image.src = url; await image.decode()
           if (!cancelled) setPreview({ src, url })
-        } catch { /* Keep the already visible original on preview failure. */ }
+        } catch { if (!cancelled) setPreview({ src, url: src }) }
         finally { image.removeAttribute('src') }
       })
     }, 160)
     return () => { cancelled = true; clearTimeout(timer); handle?.release() }
   }, [src, edge])
-  return <img src={preview?.src === src ? preview.url : src} alt={alt} draggable={false} decoding="async" />
+  // Do not decode hundreds of full-size originals while thumbnails are queued.
+  return <img src={preview?.src === src ? preview.url : undefined} alt={alt} draggable={false} decoding="async" />
 }

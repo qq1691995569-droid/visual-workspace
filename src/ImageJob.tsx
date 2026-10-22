@@ -36,10 +36,13 @@ export function ImageJob({ job, onChange, onResults, endpoint = 'images', monito
     }
     void poll(); return () => { stopped = true; controller.abort(); clearTimeout(timer) }
   }, [job.id, job.requestId, job.status, job.queryAttempt, job.monitoringStopped, endpoint, monitor, submitting])
-  const unresolved=['connection_lost','needs_attention','submission_unknown'].includes(job.status)
-  return <div className="node-executor-status" role="status">{job.message}<TaskTiming job={job}/>{!monitor&&job.status!=='complete'&&<div className="task-recovery-actions nodrag nopan">
-    {(unresolved||job.monitoringStopped||job.status==='paused')&&<button title="只查询原任务，不提交新的生图请求" onClick={()=>onChange({...job,status:'restoring',monitoringStopped:false,queryAttempt:(job.queryAttempt||0)+1,message:'正在重新查询原任务…'})}>重新查询原任务</button>}
-    {!job.monitoringStopped&&<button title="只结束本地等待，远端任务可能继续；再次生成前请核对远端，避免重复计费" onClick={()=>onChange({...job,status:'paused',monitoringStopped:true,message:'已停止本地等待，未取消远端任务。再次生成前请核对远端；也可重新查询找回结果。'})}>停止本地等待</button>}
-    {(job.taskId||unresolved)&&<small>任务编号：{job.taskId||job.id||job.requestId}</small>}
-  </div>}</div>
+  return monitor?null:<div className="node-executor-status" role="status">{job.message}<TaskTiming job={job}/><ImageJobControls job={job} onChange={onChange}/></div>
+}
+export function ImageJobControls({job,onChange}:{job:ImageJobState;onChange:(job:ImageJobState)=>void}){
+ const unresolved=['connection_lost','needs_attention','submission_unknown','paused'].includes(job.status)
+ if(job.status==='complete')return null
+ return <div className="task-recovery-actions nodrag nopan" onPointerDown={e=>e.stopPropagation()}>
+ {(unresolved||job.monitoringStopped)&&<button title="只查询原任务，不重复生成" onClick={()=>onChange({...job,status:'restoring',monitoringStopped:false,queryAttempt:(job.queryAttempt||0)+1,message:'正在重新查询原任务…'})}>查询原任务</button>}
+ {!job.monitoringStopped&&<button title="只停止本地等待，不取消远端任务" onClick={()=>onChange({...job,status:'paused',monitoringStopped:true,message:'已停止本地等待，远端任务可能继续；可查询原任务找回结果。'})}>停止等待</button>}
+ </div>
 }

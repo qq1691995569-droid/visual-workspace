@@ -1,0 +1,17 @@
+{
+  "accessKey": "",
+  "secretKey": "",
+  "workflows": [{
+    "id": "adi-flux-ttp-v2",
+    "name": "ADI FLUX TTP V2 · Liblib",
+    "enabled": false,
+    "version": 1,
+    "source_page": "https://www.liblib.art/modelinfo/18eb7fb46a204eb1afd29965ba940531?versionUuid=52f02a3638e4454084fea5966a1bb5a8",
+    "template_uuid": "",
+    "workflow_uuid": "",
+    "load_image_node_id": "",
+    "generate_params_template": {},
+    "editable_params": [],
+    "cross_field_rules": []
+  }]
+}

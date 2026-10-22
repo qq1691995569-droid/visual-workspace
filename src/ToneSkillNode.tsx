@@ -1,3 +1,4 @@
+import {useFunctionEnabled} from './functionFlags'
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, ImagePlus, Play } from 'lucide-react'
 import type { SkillInput } from './SkillNode'
@@ -7,6 +8,7 @@ export function ToneSkillNode({inputs,state,onChange,onResult}:{
   inputs: SkillInput[]; state:ToneSettings; onChange:(s:ToneSettings)=>void
   onResult:(src:string,snapshot:ToneSettings)=>void
 }) {
+  const enabled=useFunctionEnabled()('tone-skill')
   const [busy,setBusy]=useState(false),[message,setMessage]=useState('')
   const worker=useRef<Worker|null>(null)
   const base=state.base||inputs.find(i=>i.role!=='style')?.src
@@ -24,6 +26,7 @@ export function ToneSkillNode({inputs,state,onChange,onResult}:{
     }catch(e){setMessage(String(e))}
   }
   function run(sample=false){
+    if(!enabled)return
     if(!base||!reference||busy)return
     setBusy(true);setMessage(sample?'正在取样…':'正在调色…')
     const snapshot={...state,base,reference}
@@ -45,7 +48,7 @@ export function ToneSkillNode({inputs,state,onChange,onResult}:{
     }
     w.postMessage({base,reference,parameters:undefined,sample})
   }
-  return <fieldset disabled={busy} className="skill-body compact-skill tone-skill-compact nodrag nopan nowheel" style={{border:0,margin:0,minWidth:0}}>
+  return <fieldset disabled={busy||!enabled} className="skill-body compact-skill tone-skill-compact nodrag nopan nowheel" style={{border:0,margin:0,minWidth:0}}>
     {(['base','reference'] as const).map((key,index)=>{
       const src=index?reference:base, title=index?'参考图':'底图'
       const name=inputs.find(input=>input.src===src)?.label || `已上传${title}`

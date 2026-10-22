@@ -1,0 +1,65 @@
+/* Keep the administration layout independent of canvas-wide element selectors. */
+.function-admin{width:min(1440px,100%);margin:0 auto;padding:40px 48px 28px;color:var(--ui-ink);font:14px/1.65 system-ui;min-height:100dvh;box-sizing:border-box;background:var(--ui-canvas)}
+.function-admin .admin-page-header{position:static;inset:auto;transform:none;width:100%;height:auto;min-height:84px;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:0 0 28px;margin:0 0 28px;background:none;border:0;border-bottom:1px solid var(--ui-border);box-shadow:none;backdrop-filter:none;border-radius:0}
+.function-admin h1{font-size:26px;letter-spacing:-.5px;margin:0;font-weight:700;line-height:1.4}.function-admin h2{font-size:21px;margin:0;line-height:1.4}.function-admin h3{font-size:14px;margin:0 0 12px}.function-admin p{color:var(--ui-secondary);font-size:12px;line-height:1.8;margin:10px 0}.function-admin .admin-page-header p{margin:8px 0 0;font-size:13px;color:var(--ui-muted)}
+.function-admin .admin-layout{display:grid;grid-template-columns:224px minmax(0,1fr);gap:28px;align-items:start}
+.function-admin .ui-panel-card{background:var(--ui-panel);border:1px solid var(--ui-border);border-radius:18px;min-width:0;box-shadow:0 4px 20px color-mix(in srgb,var(--ui-ink) 3%,transparent)}
+.function-admin .admin-navigation{position:sticky;top:24px;display:flex;flex-direction:column;gap:5px;padding:16px;max-height:calc(100dvh - 48px);overflow:auto}
+.function-admin .admin-nav-heading{display:flex;justify-content:space-between;align-items:center;padding:4px 8px 14px;color:var(--ui-secondary);font-size:12px;font-weight:600}.admin-nav-heading span{font-size:11px;color:var(--ui-muted);font-weight:400}
+.function-admin button{border:1px solid var(--ui-border);border-radius:10px;min-height:38px;padding:9px 16px;background:var(--ui-field);color:var(--ui-ink);cursor:pointer;font-size:13px;line-height:1.4}.function-admin button:disabled{opacity:.45;cursor:default}.function-admin button:not(:disabled):hover{border-color:var(--ui-accent)}
+.function-admin .admin-navigation button{width:100%;text-align:left;display:flex;justify-content:space-between;gap:8px;min-height:43px;padding:10px 12px;background:transparent;border-color:transparent;flex-shrink:0}.function-admin .admin-navigation button.selected{background:color-mix(in srgb,var(--ui-accent) 8%,var(--ui-panel));border-color:color-mix(in srgb,var(--ui-accent) 24%,var(--ui-border));color:var(--ui-accent);font-weight:600}.function-admin .admin-navigation small{color:var(--ui-muted);font-size:10px;font-weight:400;white-space:nowrap}
+.function-admin .admin-editor{padding:32px}.function-admin .admin-editor-heading{display:flex;justify-content:space-between;gap:16px;align-items:center}.function-admin .admin-editor-heading>span{flex-shrink:0;border:1px solid var(--ui-border);background:var(--ui-field);padding:4px 10px;border-radius:20px;color:var(--ui-secondary);font-size:11px}.function-admin .admin-editor-note{margin:10px 0 22px}
+.function-admin .admin-field{display:grid;gap:10px;margin:26px 0}.function-admin .admin-field>span{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-weight:600;font-size:13px}.function-admin .admin-field small{font-size:11px;font-weight:400;color:var(--ui-muted)}
+.function-admin input:not([type=checkbox]),.function-admin textarea{box-sizing:border-box;width:100%;border:1px solid var(--ui-border);border-radius:10px;padding:14px 16px;background:var(--ui-field);color:var(--ui-ink);font:13px/1.85 system-ui}.function-admin textarea{resize:vertical;min-height:128px;display:block;scrollbar-width:thin;scrollbar-color:var(--ui-border) transparent}.function-admin textarea::placeholder{color:var(--ui-muted)}.function-admin textarea:focus{outline:2px solid color-mix(in srgb,var(--ui-accent) 35%,transparent);outline-offset:2px;border-color:var(--ui-accent)}.function-admin .admin-rules{height:clamp(340px,43vh,580px);min-height:280px;font:13px/1.95 ui-monospace,'Microsoft YaHei',monospace}
+.function-admin .admin-check{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--ui-secondary);margin:0;padding:14px 0;border-top:1px solid var(--ui-border);border-bottom:1px solid var(--ui-border)}.function-admin input[type=checkbox]{width:16px;height:16px;margin:0;accent-color:var(--ui-accent)}
+.function-admin .admin-publishing{margin-top:30px;padding-top:24px;border-top:1px solid var(--ui-border)}.function-admin .admin-publishing footer{position:static;display:flex;gap:10px;flex-wrap:wrap;padding:0;margin:0 0 12px;background:none;border:0;width:auto;height:auto;transform:none}.function-admin .admin-publish-button{background:var(--ui-accent);border-color:var(--ui-accent);color:#fff;font-weight:600}.function-admin .admin-version-tools{margin-top:16px;padding-top:14px;border-top:1px solid var(--ui-border);font-size:12px;color:var(--ui-secondary)}.function-admin summary{cursor:pointer;padding:4px 0}.function-admin .admin-rollback{display:flex;gap:12px;margin:14px 0;flex-wrap:wrap;align-items:center}
+.function-admin .admin-login{max-width:520px;padding:32px;margin:60px auto}.function-admin .admin-login form{margin-top:24px}.function-admin .admin-login button{margin-top:16px}.function-admin .admin-message{position:static;min-height:22px;margin:16px 0 0 252px;padding:0 4px;color:var(--ui-muted);font-size:12px}.function-admin .admin-page-header .theme-toggle{width:40px;height:40px;padding:10px;background:var(--ui-panel);border:1px solid var(--ui-border);border-radius:12px;color:var(--ui-secondary);flex-shrink:0}.function-admin .theme-toggle svg{width:17px;height:17px;fill:none}
+@media(max-width:1000px){.function-admin{padding:28px 24px}.function-admin .admin-layout{grid-template-columns:192px minmax(0,1fr);gap:20px}.function-admin .admin-editor{padding:24px}.function-admin .admin-message{margin-left:212px}}
+@media(max-width:700px){.function-admin{padding:20px 14px}.function-admin .admin-page-header{margin-bottom:20px;padding-bottom:20px}.function-admin h1{font-size:22px}.function-admin .admin-layout{grid-template-columns:1fr}.function-admin .admin-navigation{position:static;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:240px;padding:12px}.function-admin .admin-nav-heading{grid-column:1/-1}.function-admin .admin-editor{padding:20px}.function-admin .admin-field>span{align-items:flex-start;flex-direction:column;gap:2px}.function-admin .admin-message{margin-left:0}.function-admin .admin-editor-heading{align-items:flex-start}}
+
+.function-admin .admin-switch-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:24px 0}.function-admin .admin-switch-row{display:flex;align-items:center;justify-content:space-between;gap:16px;border:1px solid var(--ui-border);border-radius:12px;padding:18px;background:var(--ui-field)}.admin-switch-row strong{display:block;font-size:13px;font-weight:600}.admin-switch-row small{display:block;font-size:11px;color:var(--ui-muted);margin-top:5px}.function-admin .admin-feature-switch{min-width:42px;width:42px;height:24px;min-height:24px;border-radius:20px;padding:3px;display:flex;justify-content:flex-start;background:var(--ui-border);border:0;flex-shrink:0}.function-admin .admin-feature-switch[aria-checked=true]{background:var(--ui-accent);justify-content:flex-end}.admin-feature-switch>span{width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0002}@media(max-width:850px){.function-admin .admin-switch-list{grid-template-columns:1fr}}
+
+/* Primary navigation is separate from the skill-specific directory. */
+.function-admin .admin-sections{display:flex;align-items:stretch;gap:12px;margin:0 0 28px;padding:8px;background:var(--ui-panel);border:1px solid var(--ui-border);border-radius:16px}
+.function-admin .admin-sections>button{display:flex;justify-content:flex-start;text-align:left;gap:12px;padding:13px 20px;min-width:240px;border:1px solid transparent;background:transparent;color:var(--ui-secondary)}
+.function-admin .admin-sections>button>span{display:flex;flex-direction:column;gap:4px;font-size:14px;font-weight:600}
+.function-admin .admin-sections small{font-size:11px;font-weight:400;color:var(--ui-muted)}
+.function-admin .admin-sections>button.selected{background:color-mix(in srgb,var(--ui-accent) 7%,var(--ui-panel));border-color:color-mix(in srgb,var(--ui-accent) 25%,var(--ui-border));color:var(--ui-accent)}
+.function-admin .admin-section-status{margin-left:auto;align-self:center;padding:0 18px;color:var(--ui-muted);font-size:12px;white-space:nowrap}
+.function-admin .admin-layout.admin-system-layout{grid-template-columns:minmax(0,1fr)}
+.function-admin .admin-system-layout .admin-switch-list{grid-template-columns:repeat(3,minmax(0,1fr))}
+.function-admin .admin-message.admin-message-wide{margin-left:0}
+@media(max-width:1000px){.function-admin .admin-system-layout .admin-switch-list{grid-template-columns:repeat(2,minmax(0,1fr))}.function-admin .admin-section-status{display:none}.function-admin .admin-sections>button{flex:1;min-width:0}}
+@media(max-width:700px){.function-admin .admin-sections{margin-bottom:20px;gap:6px}.function-admin .admin-sections>button{padding:10px;gap:8px;align-items:flex-start}.function-admin .admin-sections small{font-size:10px}.function-admin .admin-system-layout .admin-switch-list{grid-template-columns:1fr}}
+
+/* Directory groups follow canvas entry points. */
+.function-admin .admin-directory-group{padding:14px 0 0;margin-top:8px;border-top:1px solid var(--ui-border);min-width:0}
+.function-admin .admin-directory-heading{display:flex;align-items:center;gap:7px;padding:0 8px;color:var(--ui-secondary)}
+.function-admin .admin-directory-heading h3{margin:0;font-size:12px;font-weight:600}
+.function-admin .admin-directory-heading>span{margin-left:auto;font-size:10px;color:var(--ui-muted)}
+.function-admin .admin-directory-group>p{margin:4px 8px 9px;font-size:10px;color:var(--ui-muted)}
+.function-admin .admin-directory-items{display:flex;flex-direction:column;gap:3px}
+.function-admin .admin-entry-location{font-size:11px;color:var(--ui-muted);margin-bottom:8px}
+@media(max-width:700px){.function-admin .admin-navigation{display:flex;max-height:340px}.function-admin .admin-directory-items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.function-admin .admin-task-list{display:grid;gap:12px}
+.function-admin .admin-task-item{padding:18px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-field);overflow-wrap:anywhere}
+.function-admin .admin-task-item summary{font-size:12px;color:var(--ui-secondary)}
+.function-admin .admin-task-item dl{display:grid;grid-template-columns:110px minmax(0,1fr);gap:8px;font-size:12px}
+.function-admin .admin-task-item dt{color:var(--ui-muted)}.function-admin .admin-task-item dd{margin:0}
+.function-admin .admin-sections{flex-wrap:wrap}
+
+/* Status stays readable in both themes, with text as well as color. */
+.function-admin [data-tone=complete]{--task-tone:#269a68}
+.function-admin [data-tone=running]{--task-tone:var(--ui-accent)}
+.function-admin [data-tone=failed]{--task-tone:#de5b64}
+.function-admin [data-tone=attention]{--task-tone:#c48a24}
+.function-admin .task-status-dot{width:7px;height:7px;flex:none;display:inline-block;border-radius:50%;background:var(--task-tone);box-shadow:0 0 0 3px color-mix(in srgb,var(--task-tone) 12%,transparent)}
+.function-admin .admin-editor-heading>.task-status-badge{display:inline-flex;align-items:center;gap:8px;padding:5px 11px;color:var(--ui-ink);background:color-mix(in srgb,var(--task-tone) 10%,var(--ui-panel));border-color:color-mix(in srgb,var(--task-tone) 28%,var(--ui-border))}
+.function-admin .admin-task-filters{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0 16px}
+.function-admin .admin-task-filters button{display:inline-flex;align-items:center;gap:9px;background:var(--ui-panel);font-size:12px}
+.function-admin .admin-task-filters button[aria-pressed=true]{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 8%,var(--ui-panel))}
+.function-admin .admin-task-filters button>span{font-size:11px;color:var(--ui-secondary);font-variant-numeric:tabular-nums}
+.function-admin .admin-task-meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:8px;color:var(--ui-muted);font-size:11px}
+.function-admin .admin-task-item{background:var(--ui-panel);padding:16px 18px}
+.function-admin .admin-task-item>p{margin:8px 0;color:var(--ui-secondary)}

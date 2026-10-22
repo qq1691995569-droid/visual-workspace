@@ -328,3 +328,12 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline-color:li
 .image-toolbar.small-image-toolbar>button{display:inline-flex;align-items:center;gap:5px;padding:7px 8px;font-size:12px;line-height:18px;min-height:32px;border-radius:6px;flex-shrink:0}
 .image-toolbar.small-image-toolbar>button svg{width:15px;height:15px;flex-shrink:0}
 .image-toolbar.small-image-toolbar>button span{display:inline;font-size:12px;color:light-dark(#536b8d, #b7c0ce)}
+
+.result-placeholder .task-recovery-actions{position:relative;z-index:3;pointer-events:auto;display:flex;justify-content:center;flex-wrap:wrap;gap:8px;margin-top:10px}
+.result-placeholder .task-recovery-actions button{background:var(--ui-panel);color:var(--ui-secondary);border:1px solid var(--ui-border);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer}
+.result-placeholder .task-recovery-actions button:hover{color:var(--ui-accent);border-color:var(--ui-accent)}
+/* During navigation, reuse the existing image layers; restore polish on idle. */
+.react-flow.viewport-interacting .card.image,
+.react-flow.viewport-interacting .workflow-group { box-shadow:none !important; }
+.react-flow.viewport-interacting .image-origin-label { text-shadow:none; }
+.react-flow.viewport-interacting .edge-data-stream { animation-play-state:paused; }

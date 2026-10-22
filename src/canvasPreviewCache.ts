@@ -3,6 +3,22 @@ const entries = new Map<string, Map<number, Entry>>()
 const queue: Entry[] = []
 let worker: Worker | undefined, unavailable = false, active: Entry | undefined, serial = 0
 const budget = 64 * 1024 * 1024
+let idleCleanup: ReturnType<typeof setTimeout> | undefined
+function releaseUnused() {
+  if (idleCleanup) clearTimeout(idleCleanup)
+  // A short grace period avoids churn while panning across the viewport edge.
+  idleCleanup = setTimeout(() => {
+    idleCleanup = undefined
+    for (const [src, versions] of entries) {
+      for (const [edge, item] of versions) {
+        if (item.refs || !item.url || item === active) continue
+        if (item.url !== item.src) URL.revokeObjectURL(item.url)
+        versions.delete(edge)
+      }
+      if (!versions.size) entries.delete(src)
+    }
+  }, 2000)
+}
 function prune() {
   const all = [...entries.values()].flatMap(items => [...items.values()])
   const footprint = (item: Entry) => item.bytes + item.src.length * 2
@@ -35,6 +51,7 @@ function pump() {
           item.bytes = data.bytes || 0
           item.resolve(item.url)
           active = undefined
+          if (!item.refs) releaseUnused()
           prune(); pump()
         }
         worker.onerror = () => {
@@ -62,5 +79,5 @@ export function acquireCanvasPreview(src: string, edge: number) {
   item.refs++; item.touched = Date.now()
   pump()
   let released = false
-  return { promise: item.promise, release() { if (released) return; released = true; item!.refs--; item!.touched = Date.now(); prune() } }
+  return { promise: item.promise, release() { if (released) return; released = true; item!.refs--; item!.touched = Date.now(); prune(); releaseUnused() } }
 }

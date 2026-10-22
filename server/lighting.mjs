@@ -1,3 +1,4 @@
+import {configuredText,personaText} from './function-config.mjs'
 export const exteriorCheckPrompt='你是场景结构检查员。仅检查原始底图是否存在真实窗户或敞开的外门，并且能直接看到室外景观。墙面、画框、镜面反射、电视、光斑、窗影、被窗帘完全遮挡的开口以及推断的画外光源都不算。不得依据用户想要的外景猜测存在窗户。只输出 JSON：{"visibleExterior":true或false,"confidence":"high或medium或low","region":"实际可见窗外区域的位置和边界，未发现时为空"}。不确定时返回 false。'
 export function lightingPlan(settings={},supplement='',exteriorEvidence){
  if(!settings||typeof settings!=='object'||Array.isArray(settings))throw Error('光影参数无效')
@@ -34,5 +35,5 @@ export function lightingPlan(settings={},supplement='',exteriorEvidence){
  显式光影目标：${instructions.join(' ')||'自然改善曝光、白平衡、高光和暗部层次，不改变原照明布局。'}
  用户补充说明：${supplement||'无'}
  保持机位、透视、裁切、构图、家具和人物的数量、位置、尺度、造型、姿态与遮挡。保持纹理、材质固有色、产品外观与原有文字。${exterior?'除上述明确授权的窗外景观外，其余区域只调整光影。':'保持原有窗外景观。'}只调整光照导致的明暗、色偏、高光、投影和反射，统一全图光照，保留自然接触阴影。禁止换家具、换材质、改变人物身份或新增装饰。输出一张完整照片，不添加文字、编号、分屏或说明。`
- return {version:'scene-lighting-v5',mode,adjustments,exteriorEvidence,effective,supplement,prompt}
+ return {version:'scene-lighting-v5',mode,adjustments,exteriorEvidence,effective,supplement,prompt:[personaText('light'),prompt,configuredText('light','')].filter(Boolean).join('\n')}
 }

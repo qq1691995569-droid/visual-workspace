@@ -11,3 +11,15 @@
 .comparison-caption { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-top:12px; color:light-dark(#8a9ab1, #b7c0ce); font-size:var(--text-caption,12px); line-height:1.5; }
 .comparison-caption button { color:light-dark(#647fa7, rgb(155 182 207)); padding:5px 9px; border:1px solid light-dark(#dbe3ef, #3b424e); border-radius:6px; background:light-dark(#f5f8fc, #242830); font-size:var(--text-caption,12px); }
 @media(max-width:720px) { .comparison-result { max-width:calc(100vw - 50px); max-height:61dvh; } .comparison-caption { flex-wrap:wrap; justify-content:center; } }
+.comparison-stage { touch-action:none; }
+.comparison-stage.is-zoomed { cursor:grab; }
+.comparison-stage.is-zoomed:active { cursor:grabbing; }
+.comparison-result,.comparison-original img { transform-origin:center; }
+.comparison-drag-handle { position:absolute; top:0; bottom:0; width:32px; max-width:100%; transform:translateX(-50%); z-index:4; cursor:ew-resize; touch-action:none; }
+.comparison-drag-handle:focus-visible { outline:2px solid var(--ui-accent); outline-offset:-2px; }
+.comparison-zoom-controls { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+.comparison-zoom-controls>span { min-width:40px; font-variant-numeric:tabular-nums; }
+.comparison-zoom-controls button { display:flex; align-items:center; justify-content:center; color:var(--ui-secondary); background:var(--ui-field); border-color:var(--ui-border); }
+.comparison-zoom-controls button:disabled { opacity:.4; cursor:default; }
+.single-image-view .comparison-result { max-height:calc(92vh - 150px); max-width:calc(94vw - 42px); }
+@media(max-width:720px) { .single-image-view .comparison-result { max-width:calc(94vw - 26px); } }

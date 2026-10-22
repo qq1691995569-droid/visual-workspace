@@ -5,6 +5,8 @@ export function fitGroupNodes<N extends Node>(nodes: N[]): N[] {
   let next = nodes
   for (const original of nodes) {
     if (original.data.kind !== 'group') continue
+    // A settled collection has fixed dimensions. Its contents need no layout scan.
+    if (original.data.collapsed && original.width === 280 && original.height === 330 && original.style?.width === 280 && original.style?.height === 330) continue
     const group = next.find(n => n.id === original.id)!
     const children = next.filter(n => n.parentId === group.id)
     if (group.dragging || group.resizing || children.some(n => n.dragging || n.resizing)) continue

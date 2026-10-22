@@ -1,3 +1,9 @@
+import {liblibUpscale} from './liblib-upscale.mjs'
+import {safeTaskMessage} from './task-monitor.mjs'
+import {imageToolError} from './image-tool-error.mjs'
+import {functionStore,manageConfig,adminKey} from './config-admin.mjs'
+import {configContext,configSnapshot,featureForRoute,featureConfig,publicFeatures} from './function-config.mjs'
+import {upscaleBridge} from './upscale-bridge.mjs'
 import {separationRunner} from './interior-separate.mjs'
 import {resolveSkillRatio} from './skill-ratio.mjs'
 import {localCutout} from './local-cutout.mjs'
@@ -50,6 +56,7 @@ const liveJobs = new Map()
 const pendingWrites = new Map()
 const deletedJobs = new Set()
 async function save(record) {
+  if(record.type==='generation'&&!record.functionConfig)record.functionConfig=configSnapshot()
   if(deletedJobs.has(record.id))return
   if (record.type === 'generation') {
     liveJobs.set(record.id, record)
@@ -76,6 +83,7 @@ async function load(id) {
 }
 async function submissionFailure(job, error, attempted) {
   if(deletedJobs.has(job.id))return
+  job.failure={stage:job.taskId?'after_submit':attempted?'submission_unknown':'before_submit',message:safeTaskMessage(error.message),at:new Date().toISOString(),previousStatus:job.status}
   job.status = job.taskId ? 'running' : attempted ? 'submission_unknown' : 'paused'
   job.message = job.taskId ? '任务已提交，正在恢复本地记录；不会重复生图' : attempted ? '提交结果未确认，请先在 DREO 核对任务；不会自动重复提交' : error.code === 'LOCAL_SAVE_FAILED' ? '本地任务记录暂时无法保存，本次尚未提交生图；请稍后重试' : error.message
   try { await save(job) } catch { job.warning = '本地保存暂时失败，已保留恢复文件，请保持服务运行' }
@@ -103,10 +111,10 @@ function visionConfigured() { return !!(visionSettings.endpoint && visionSetting
 async function assetImageTool(body) {
   const python = process.env.CANVAS_PYTHON || path.join(homedir(), '.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe')
   return new Promise((resolve,reject) => {
-    const child = spawn(python,[path.join(root,'server/asset_image.py')],{windowsHide:true,timeout:60000})
+    const child = spawn(python,[path.join(root,'server/asset_image.py')],{windowsHide:true,timeout:60000,env:{...process.env,PYTHONUTF8:'1'}})
     let out='',diagnostic=''; child.stdout.on('data',bytes=>{out+=bytes}); child.stderr.on('data',bytes=>{diagnostic=(diagnostic+bytes).slice(-4000)})
     child.on('error',()=>reject(Error('局部图像处理运行时不可用')))
-    child.on('close',code=>{try {if(code!==0) throw Error(); resolve(JSON.parse(out))} catch {reject(Error(diagnostic.includes('Expansion alignment check failed')?'扩图结果改变了原图位置或内容，已停止合成，避免重影与接缝。请调整扩图范围或更换模型后重试。':'局部图像处理失败，请检查图片和选区'))}})
+    child.on('close',(code,signal)=>{try {if(code!==0) throw Error(); resolve(JSON.parse(out))} catch {reject(Error(imageToolError(diagnostic,{action:body.action,signal})))}})
     child.stdin.on('error',()=>{}); child.stdin.end(JSON.stringify(body))
   })
 }
@@ -159,6 +167,7 @@ async function whiteBackgroundResult(job, source) {
 const syncSeparation=separationRunner({active,save,load,vision,imageRequest,submitImage,syncJob,cutout:localCutout,imageTool:assetImageTool,capabilities:()=>dreo('GET','/capabilities'),deleted:id=>deletedJobs.has(id)})
 async function syncJob(job) {
   if(job.deletedAt||deletedJobs.has(job.id))return {...job,status:"paused",message:"任务已删除",images:[]}
+  if(job.provider==='liblib')return localLiblib.sync(job)
   if(job.separation)return syncSeparation(job)
   if (!job.taskId || active.has(job.id) || job.status==='paused' || job.status==='complete' && (!(job.personAsset||job.assetCandidate) || job.asset || job.assetDraft)) return job
   active.add(job.id)
@@ -232,6 +241,7 @@ async function submit(job, prepared) {
     for (const image of [prepared.gray, prepared.line]) { const result = await dreo('POST', '/upload', { image }); if (!result.storage_key) throw Error('上传未返回 storage_key'); keys.push(result.storage_key) }
     const request = generationRequest(job.plan, keys, job.ratio, job.rules || rules, job.options)
     job.status = 'submitting'; job.message = '正在提交生成任务'; await save(job)
+    job.submissionAttemptedAt=new Date().toISOString();await save(job)
     attempted = true
     if(deletedJobs.has(job.id))return
     const task = await dreo('POST', '/tasks', request)
@@ -256,6 +266,7 @@ async function submitImage(job, body, request) {
       request.params.image_paths = keys
     }
     job.status = 'submitting'; job.message = job.phase?'步骤 3/4 · 正在提交生图任务':'正在提交 DREO 生图任务'; await save(job)
+    job.submissionAttemptedAt=new Date().toISOString();await save(job)
     attempted = true
     if(deletedJobs.has(job.id))return
     const task = await dreo('POST', '/tasks', request)
@@ -286,7 +297,7 @@ async function executeSkill(job, body, routes) {
   } catch (error) { await submissionFailure(job, error, false) }
   finally { active.delete(job.id) }
 }
-function publicJob(job) { return { id: job.id, createdAt: job.createdAt, finishedAt: job.finishedAt, serverNow: new Date().toISOString(), status: job.status, message: /EPERM|EACCES|EBUSY|operation not permitted/.test(job.message || '') ? '本地任务记录保存失败，请核对任务状态；不会自动重复生图' : job.message, taskId: job.taskId, warning: job.warning, phase:job.phase, resolvedRegions:job.resolvedRegions, separationPlan:job.separation?.plan, images: job.images, asset:job.asset, ratio: job.ratio, skillVersion: job.canvasSkill?.version || job.rules?.version || 1, skillHash:job.canvasSkill?.hash, adjustments: job.plan?.adjustments || [] } }
+function publicJob(job) { return { id: job.id, createdAt: job.createdAt, finishedAt: job.finishedAt, serverNow: new Date().toISOString(), status: job.status, message: /EPERM|EACCES|EBUSY|operation not permitted/.test(job.message || '') ? '本地任务记录保存失败，请核对任务状态；不会自动重复生图' : job.message, taskId: job.taskId || job.generateUuid, provider:job.provider, warning: job.warning, phase:job.phase, resolvedRegions:job.resolvedRegions, separationPlan:job.separation?.plan, images: job.images, asset:job.asset, ratio: job.ratio, skillVersion: job.canvasSkill?.version || job.rules?.version || 1, skillHash:job.canvasSkill?.hash, adjustments: job.plan?.adjustments || [] } }
 function monitor(id) {
   if (deletedJobs.has(id)||monitors.has(id)) return
   const timer = setTimeout(async () => {
@@ -295,7 +306,14 @@ function monitor(id) {
   }, 6000)
   timer.unref(); monitors.set(id, timer)
 }
+const localLiblib=liblibUpscale({directory:store,load,save,publicJob,onReady:monitor,inspect:base=>assetImageTool({action:'inspect',base})})
+const handleUpscale=upscaleBridge({dreo,load,save,active,monitor,publicJob,imageValid,create:async job=>{
+  await mkdir(store,{recursive:true})
+  try{await writeFile(idPath(job.id),JSON.stringify({...job,functionConfig:job.functionConfig||configSnapshot()}),{flag:'wx'});return true}catch(error){if(error.code==='EEXIST')return false;throw error}
+}})
 async function handle(method, url, body) {
+  const liblibResult=await localLiblib.handle(method,url,body);if(liblibResult!==undefined)return liblibResult
+  const upscaleResult=await handleUpscale(method,url,body);if(upscaleResult!==undefined)return upscaleResult
   if(method==='DELETE'&&/^\/api\/skills\/tasks\/[a-f0-9-]{36}$/.test(url)){
     const id=url.split('/').at(-1)
     let job;try{job=await load(id)}catch(error){if(error.code!=='ENOENT')throw error}
@@ -359,7 +377,7 @@ async function handle(method, url, body) {
     if(prior){if(prior.fingerprint!==fingerprint)throw Error('请求 ID 已使用');return publicJob(prior)}
     const job={id:body.requestId,type:'generation',feature:'image',fingerprint,status:'analyzing',message:'正在识别人物外观',images:[],createdAt:new Date().toISOString()}
     await mkdir(store,{recursive:true})
-    try{await writeFile(idPath(job.id),JSON.stringify(job),{flag:'wx'})}catch(error){if(error.code!=='EEXIST')throw error;const existing=await load(job.id);if(existing.fingerprint!==fingerprint)throw Error('请求 ID 已使用');return publicJob(existing)}
+    try{await writeFile(idPath(job.id),JSON.stringify({...job,functionConfig:job.functionConfig||configSnapshot()}),{flag:'wx'})}catch(error){if(error.code!=='EEXIST')throw error;const existing=await load(job.id);if(existing.fingerprint!==fingerprint)throw Error('请求 ID 已使用');return publicJob(existing)}
     void (async()=>{
       try{
         const result=await vision(assetAnalysisPrompt('person',String(body.focus||'画面中主要人物'))+'若有多位人物且未明确指定，只返回空数组并要求用户指定；只提取一个人物。',[body.base])
@@ -404,7 +422,7 @@ async function handle(method, url, body) {
       if(prior){if(prior.fingerprint!==fingerprint)throw Error('请求 ID 已用于另一组局部修改');return publicJob(prior)}
       const job={id,type:'generation',feature:'image',fingerprint,deferredEdit:body.edit,options:{...body.options},status:'locating',phase:{step:1,total:4},message:'步骤 1/4 · 已排队，准备后台识别对象',images:[],createdAt:new Date().toISOString()}
       await mkdir(store,{recursive:true})
-      try{await writeFile(idPath(id),JSON.stringify(job),{flag:'wx'})}catch(error){if(error.code!=='EEXIST')throw error;const existing=await load(id);if(existing.fingerprint!==fingerprint)throw Error('请求 ID 冲突');return publicJob(existing)}
+      try{await writeFile(idPath(id),JSON.stringify({...job,functionConfig:job.functionConfig||configSnapshot()}),{flag:'wx'})}catch(error){if(error.code!=='EEXIST')throw error;const existing=await load(id);if(existing.fingerprint!==fingerprint)throw Error('请求 ID 冲突');return publicJob(existing)}
       active.add(id)
       void prepareDeferredEdit(job,body,{save,inspect:async base=>{const meta=await assetImageTool({action:'inspect',base});return meta},capabilities:()=>dreo('GET','/capabilities'),validate:imageRequest,locate:async(kind,mark,hint)=>locatedObject(await vision(objectLocatePrompt(kind,mark,hint),[body.base]),mark),prepare:assetImageTool,submit:submitImage}).catch(error=>submissionFailure(job,error,false)).finally(()=>active.delete(id))
       return publicJob(job)
@@ -420,7 +438,7 @@ async function handle(method, url, body) {
     const request=imageRequest(input,await dreo('GET','/capabilities'))
     const job={id,type:'generation',feature:'image',fingerprint,ratio,warning:resolvedRatio.warning,localEdit:{...(body.edit.kind==='model'||body.options?.ratio && body.options.ratio!=='auto'?{spatialGuidance:'object-outline'}:{}),base:body.base,points:body.edit.points,strokes:body.edit.strokes,regions:body.edit.regions?.map(r=>({points:r.points,strokes:r.strokes}))},options:{...input.options},status:'queued',message:body.edit.kind==='model'?'整件模型替换已排队，按参考替换附件并保留生成尺寸':'局部编辑已排队，选区外将保留原图像素',images:[],createdAt:new Date().toISOString()}
     await mkdir(store,{recursive:true})
-    try {await writeFile(idPath(id),JSON.stringify(job),{flag:'wx'})} catch(error) {if(error.code!=='EEXIST') throw error; const existing=await load(id); if(existing.fingerprint!==fingerprint) throw Error('请求 ID 冲突'); return publicJob(existing)}
+    try {await writeFile(idPath(id),JSON.stringify({...job,functionConfig:job.functionConfig||configSnapshot()}),{flag:'wx'})} catch(error) {if(error.code!=='EEXIST') throw error; const existing=await load(id); if(existing.fingerprint!==fingerprint) throw Error('请求 ID 冲突'); return publicJob(existing)}
     void submitImage(job,input,request); return publicJob(job)
   }
   if (method === 'POST' && url === '/api/skills/light/run') {
@@ -461,13 +479,13 @@ async function handle(method, url, body) {
       imageRequest({mode:'redraw',images:[body.base],prompt:'分层预检',options},caps)
       const job={id:body.requestId,type:'generation',feature:'image',canvasSkill:skill,fingerprint,options,status:'analyzing',message:'正在准备室内场景分层',images:[],createdAt:new Date().toISOString(),separation:{base:body.base,supplement:parameters.prompt||'',source:meta}}
       await mkdir(store,{recursive:true})
-      try{await writeFile(idPath(job.id),JSON.stringify(job),{flag:'wx'})}catch(error){if(error.code!=='EEXIST')throw error;return publicJob(await load(job.id))}
+      try{await writeFile(idPath(job.id),JSON.stringify({...job,functionConfig:job.functionConfig||configSnapshot()}),{flag:'wx'})}catch(error){if(error.code!=='EEXIST')throw error;return publicJob(await load(job.id))}
       void syncSeparation(job).then(()=>monitor(job.id));return publicJob(job)
     }
     if(localProcessors.includes(skill.processor)){
       const job={id:body.requestId,type:'generation',feature:'image',canvasSkill:skill,fingerprint,options:{count:1},status:'queued',message:'本地处理已排队',images:[],createdAt:new Date().toISOString()}
       await mkdir(store,{recursive:true})
-      try{await writeFile(idPath(job.id),JSON.stringify(job),{flag:'wx'})}catch(error){if(error.code!=='EEXIST')throw error;const existing=await load(job.id);if(existing.fingerprint!==fingerprint)throw Error('请求 ID 冲突');return publicJob(existing)}
+      try{await writeFile(idPath(job.id),JSON.stringify({...job,functionConfig:job.functionConfig||configSnapshot()}),{flag:'wx'})}catch(error){if(error.code!=='EEXIST')throw error;const existing=await load(job.id);if(existing.fingerprint!==fingerprint)throw Error('请求 ID 冲突');return publicJob(existing)}
       active.add(job.id)
       void (async()=>{
         const mask=selection?(await assetImageTool({action:'prepare',base:body.base,...selection})).mask:undefined
@@ -490,7 +508,7 @@ async function handle(method, url, body) {
     const request=imageRequest(input,caps)
     const job={id:body.requestId,type:'generation',feature:'image',canvasSkill:skill,canvasBase:body.base,...(selection?{localEdit:{base:body.base,...selection}}:{}),fingerprint,options:input.options,status:'queued',message:'正在准备'+skill.name,images:[],createdAt:new Date().toISOString()}
     await mkdir(store,{recursive:true})
-    try{await writeFile(idPath(job.id),JSON.stringify(job),{flag:'wx'})}catch(error){if(error.code!=='EEXIST')throw error;const existing=await load(job.id);if(existing.fingerprint!==fingerprint)throw Error('请求 ID 冲突');return publicJob(existing)}
+    try{await writeFile(idPath(job.id),JSON.stringify({...job,functionConfig:job.functionConfig||configSnapshot()}),{flag:'wx'})}catch(error){if(error.code!=='EEXIST')throw error;const existing=await load(job.id);if(existing.fingerprint!==fingerprint)throw Error('请求 ID 冲突');return publicJob(existing)}
     void submitImage(job,input,request);return publicJob(job)
   }
   if(method==='POST' && url==='/api/skills/expand/tasks'){
@@ -515,7 +533,7 @@ async function handle(method, url, body) {
     const request=imageRequest(input,caps)
     const job={id:body.requestId,type:'generation',feature:'image',canvasSkill:skill,fingerprint,expansion,options:input.options,status:'queued',message:'正在准备扩图',images:[],createdAt:new Date().toISOString()}
     await mkdir(store,{recursive:true})
-    try{await writeFile(idPath(job.id),JSON.stringify(job),{flag:'wx'})}catch(error){if(error.code!=='EEXIST')throw error;const existing=await load(job.id);if(existing.fingerprint!==fingerprint)throw Error('请求 ID 冲突');return publicJob(existing)}
+    try{await writeFile(idPath(job.id),JSON.stringify({...job,functionConfig:job.functionConfig||configSnapshot()}),{flag:'wx'})}catch(error){if(error.code!=='EEXIST')throw error;const existing=await load(job.id);if(existing.fingerprint!==fingerprint)throw Error('请求 ID 冲突');return publicJob(existing)}
     void submitImage(job,input,request);return publicJob(job)
   }
   if (method === 'POST' && (url === '/api/skills/images/tasks'||url === '/api/skills/light/run')) {
@@ -528,7 +546,7 @@ async function handle(method, url, body) {
     const request = imageRequest(body, await dreo('GET', '/capabilities'))
     const job = { id, type: 'generation', feature: 'image', ...(url==='/api/skills/light/run'?{lightingPlan:body.lightingPlan,warning:body.lightingPlan.adjustments.join('；')||undefined}:{}), fingerprint, options: { ...request.params.route_override, ratio: request.params.ratio, resolution: request.params.resolution, count: request.params.count }, status: 'queued', message: '等待提交', images: [], createdAt: new Date().toISOString() }
     await mkdir(store, { recursive: true })
-    try { await writeFile(idPath(id), JSON.stringify(job), { flag: 'wx' }) } catch (error) { if (error.code !== 'EEXIST') throw error; const existing = await load(id); if (existing.fingerprint !== fingerprint) throw Error('请求 ID 冲突'); return publicJob(existing) }
+    try { await writeFile(idPath(id), JSON.stringify({...job,functionConfig:job.functionConfig||configSnapshot()}), { flag: 'wx' }) } catch (error) { if (error.code !== 'EEXIST') throw error; const existing = await load(id); if (existing.fingerprint !== fingerprint) throw Error('请求 ID 冲突'); return publicJob(existing) }
     void submitImage(job, body, request); return publicJob(job)
   }
   if (method === 'GET' && url === '/api/skills/admin') return registry.read()
@@ -555,14 +573,15 @@ async function handle(method, url, body) {
     const fingerprint = createHash('sha256').update(JSON.stringify({ base: body.base, references: body.references, options: body.options, supplement: body.supplement || '' })).digest('hex')
     let prior; try { prior = await load(id) } catch (error) { if (error.code !== 'ENOENT') throw error }
     if (prior) { if (prior.fingerprint !== fingerprint) throw Error('请求已使用，请核对上次任务'); return publicJob(prior) }
-    const snapshot = await registry.active()
+    const currentFeature=featureConfig('style')
+    const snapshot = currentFeature ? {...await registry.active(),version:configContext.getStore().revision,rules:[currentFeature.persona,...currentFeature.text.split('\n')].filter(Boolean)} : await registry.active()
     const routes = modelRoutes(await dreo('GET', '/capabilities'))
     // Validate parameters before analysis or submission. Real base aspect is resolved after preparation.
     const provisionalRatio = body.options?.ratio && body.options.ratio !== 'auto' ? body.options.ratio : routes.find(r => r.model === (body.options?.model || MODEL))?.supported_aspects?.find(r => r !== 'auto' && r !== 'custom') || '3:4'
     runOptions(body.options, routes, provisionalRatio)
     const job = { id, type: 'generation', fingerprint, rules: snapshot, supplement: body.supplement || '', status: 'preparing', message: '正在准备图像', images: [], createdAt: new Date().toISOString() }
     await mkdir(store, { recursive: true })
-    try { await writeFile(idPath(id), JSON.stringify(job), { flag: 'wx' }) } catch (error) { if (error.code !== 'EEXIST') throw error; const existing = await load(id); if (existing.fingerprint !== fingerprint) throw Error('请求 ID 已使用'); return publicJob(existing) }
+    try { await writeFile(idPath(id), JSON.stringify({...job,functionConfig:job.functionConfig||configSnapshot()}), { flag: 'wx' }) } catch (error) { if (error.code !== 'EEXIST') throw error; const existing = await load(id); if (existing.fingerprint !== fingerprint) throw Error('请求 ID 已使用'); return publicJob(existing) }
     void executeSkill(job, body, routes); return publicJob(job)
   }
   if (method === 'POST' && url === '/api/skills/style/prepare') {
@@ -596,12 +615,13 @@ async function handle(method, url, body) {
     if (!caps.routes?.['conversation-image']?.available_routes?.some(r => r.model === MODEL && r.provider === 'seedream')) throw Error('DREO 未开放指定模型，不会降级替换')
     const job = { id, type: 'generation', preparationId: prep.id, fingerprint, plan, ratio: prep.ratio, status: 'queued', message: '等待提交', images: [], createdAt: new Date().toISOString() }
     await mkdir(store, { recursive: true })
-    try { await writeFile(idPath(id), JSON.stringify(job), { flag: 'wx' }) }
+    try { await writeFile(idPath(id), JSON.stringify({...job,functionConfig:job.functionConfig||configSnapshot()}), { flag: 'wx' }) }
     catch (error) { if (error.code !== 'EEXIST') throw error; const prior = await load(id); if (prior.fingerprint !== fingerprint) throw Error('请求 ID 已使用'); return publicJob(prior) }
     void submit(job, prep); return publicJob(job)
   }
   if (method === 'GET' && /^\/api\/skills\/(style|images)\/tasks\/[a-f0-9-]{36}$/.test(url)) {
     let job;try{job=await load(url.split('/').pop())}catch(error){if(error.code==='ENOENT')throw Object.assign(Error('此任务的本地记录不存在'),{code:'TASK_NOT_FOUND'});throw error} if (job.type !== 'generation') throw Error('不是生成任务')
+    if(job.provider==='liblib')return publicJob(await localLiblib.sync(job))
     if(!active.has(job.id)&&!job.taskId&&['locating','composing'].includes(job.status)){job.status='paused';job.message='后台识别或组合被服务重启中断，尚未提交生图；请重新生成';await save(job)}
     if (!job.separation && !active.has(job.id) && !job.taskId && ['preparing','analyzing','queued','uploading','submitting'].includes(job.status)) { job.status = 'submission_unknown'; job.message = '本地进程曾中断，请在 DREO 核对后处理；不会自动重新提交'; await save(job) }
     return publicJob(await syncJob(job))
@@ -611,8 +631,9 @@ async function handle(method, url, body) {
 export function skillApi() {
   return { name: 'local-canvas-skills', async configureServer(server) {
     visionSettings = await readVisionSettings()
-    void readdir(store).then(async files => { for (const file of files.filter(f => /^[a-f0-9-]{36}\.json$/.test(f))) { try { const job = await json(path.join(store,file));if(job.deletedAt){deletedJobs.add(job.id);continue} if(job.type==='asset-extraction'&&job.status==='analyzing'){job.status='paused';job.message='分析被服务重启中断，尚未提交预览生成，请重新提取';await save(job)} if(job.type==='generation'&&localProcessors.includes(job.canvasSkill?.processor)&&!['complete','paused'].includes(job.status)){job.status='paused';job.message='本地模型任务被服务重启中断，未自动重新提交；请核对原任务';await save(job)} if(job.separation&&!['complete','paused','needs_attention'].includes(job.status))monitor(job.id); if (job.type === 'generation' && job.taskId && (!['complete','paused'].includes(job.status)||job.status==='complete'&&(job.personAsset||job.assetCandidate)&&!job.asset&&!job.assetDraft)) monitor(job.id) } catch { /* Keep invalid records untouched. */ } } }).catch(() => {})
+    void readdir(store).then(async files => { for (const file of files.filter(f => /^[a-f0-9-]{36}\.json$/.test(f))) { try { const job = await json(path.join(store,file));if(job.deletedAt){deletedJobs.add(job.id);continue} if(job.type==='asset-extraction'&&job.status==='analyzing'){job.status='paused';job.message='分析被服务重启中断，尚未提交预览生成，请重新提取';await save(job)} if(job.type==='generation'&&localProcessors.includes(job.canvasSkill?.processor)&&!['complete','paused'].includes(job.status)){job.status='paused';job.message='本地模型任务被服务重启中断，未自动重新提交；请核对原任务';await save(job)} if(job.provider==='liblib'&&job.generateUuid&&!['complete','paused'].includes(job.status))monitor(job.id); if(job.separation&&!['complete','paused','needs_attention'].includes(job.status))monitor(job.id); if (job.type === 'generation' && job.taskId && (!['complete','paused'].includes(job.status)||job.status==='complete'&&(job.personAsset||job.assetCandidate)&&!job.asset&&!job.assetDraft)) monitor(job.id) } catch { /* Keep invalid records untouched. */ } } }).catch(() => {})
     server.httpServer?.once('close', () => { for (const timer of monitors.values()) clearTimeout(timer); monitors.clear(); liveJobs.clear() })
+    void adminKey()
     server.middlewares.use(async (req, res, next) => {
       if (!req.url?.startsWith('/api/skills/')) return next()
       res.setHeader('Content-Type', 'application/json; charset=utf-8'); res.setHeader('Cache-Control', 'no-store')
@@ -626,8 +647,14 @@ export function skillApi() {
           for await (const chunk of req) { size += chunk.length; if (size > 100 * 1024 * 1024) throw Error('输入总量超过 100MB'); chunks.push(chunk) }
           body = JSON.parse(Buffer.concat(chunks).toString('utf8'))
         }
-        res.end(JSON.stringify(await handle(req.method, req.url, body)))
-      } catch (error) { res.statusCode = error.code==='TASK_NOT_FOUND'?404:400; const safe = error.code === 'ENOENT' ? '本地记录或配置不存在，请重新准备图片或检查 DREO 凭据' : error.message?.includes('fetch') ? '上游连接失败' : error.message; res.end(JSON.stringify({ error: safe || '技能执行失败', ...(error.code==='TASK_NOT_FOUND'?{code:'TASK_NOT_FOUND'}:{}) })) }
+        if(req.url.startsWith('/api/skills/admin'))throw Object.assign(Error('旧管理接口已关闭，请使用独立配置后台'),{status:403})
+        if(req.url.startsWith('/api/skills/config-admin')){res.end(JSON.stringify(await manageConfig(req,res,body)));return}
+        const published=await functionStore.active()
+        if(req.method==='GET'&&req.url==='/api/skills/functions'){res.end(JSON.stringify({revision:published.revision,features:publicFeatures(published)}));return}
+        const feature=featureForRoute(req.url,body)
+        if(req.method==='POST'&&publicFeatures(published).some(f=>f.id===feature&&!f.enabled))throw Object.assign(Error('此功能已由管理员停用'),{status:403})
+        res.end(JSON.stringify(await configContext.run(published.revision?published:undefined,()=>handle(req.method,req.url,body))))
+      } catch (error) { res.statusCode = error.status || (error.code==='TASK_NOT_FOUND'?404:400); const safe = error.code === 'ENOENT' ? '本地记录或配置不存在，请重新准备图片或检查 DREO 凭据' : error.message?.includes('fetch') ? '上游连接失败' : error.message; res.end(JSON.stringify({ error: safe || '技能执行失败', ...(error.code==='TASK_NOT_FOUND'?{code:'TASK_NOT_FOUND'}:{}) })) }
     })
   } }
 }
