@@ -3,8 +3,11 @@ import {liblibUpscale} from './liblib-upscale.mjs'
 import {prepareReference,referenceLimits} from './reference-image.mjs'
 import {sharedUpscale} from './upscale-connection.mjs'
 import {safeTaskMessage} from './task-monitor.mjs'
+import {dreoValidationSummary} from './dreo-error.mjs'
+import {openLuxConfig,submitOpenLuxNative} from './openlux-native.mjs'
+import {submitOpenLuxEdit} from './openlux-edit.mjs'
 import {imageToolError} from './image-tool-error.mjs'
-import {functionStore,manageConfig,adminKey} from './config-admin.mjs'
+import {functionStore,manageConfig,adminKey,apiRoutes} from './config-admin.mjs'
 import {configContext,configSnapshot,featureForRoute,featureConfig,publicFeatures} from './function-config.mjs'
 import {upscaleBridge} from './upscale-bridge.mjs'
 import {separationRunner} from './interior-separate.mjs'
@@ -26,6 +29,7 @@ import { spawn } from 'node:child_process'
 import { parseEnv } from 'node:util'
 import { skillStore } from './skill-store.mjs'
 import { imageRequest } from './image-request.mjs'
+import { INTERACTIVE_EDIT_MODEL, interactiveEditPrompt } from './interactive-edit.mjs'
 import { assetStore, assetImage, selectionPoints, selectionStrokes, analysisCandidates, assetAnalysisPrompt, localEditPlan, localEditImages, usesAssetReference } from './canvas-assets.mjs'
 import {personSheetPrompt} from './person-assets.mjs'
 import {extractionTargets,extractionPrompt,extractedAssets,assetPreviewPrompt} from './asset-extraction.mjs'
@@ -88,7 +92,7 @@ async function submissionFailure(job, error, attempted) {
   if(deletedJobs.has(job.id))return
   job.failure={stage:job.taskId?'after_submit':attempted?'submission_unknown':'before_submit',message:safeTaskMessage(error.message),at:new Date().toISOString(),previousStatus:job.status}
   job.status = job.taskId ? 'running' : attempted ? 'submission_unknown' : 'paused'
-  job.message = job.taskId ? '任务已提交，正在恢复本地记录；不会重复生图' : attempted ? '提交结果未确认，请先在 DREO 核对任务；不会自动重复提交' : error.code === 'LOCAL_SAVE_FAILED' ? '本地任务记录暂时无法保存，本次尚未提交生图；请稍后重试' : error.message
+  job.message = job.taskId ? '任务已提交，正在恢复本地记录；不会重复生图' : attempted ? `提交结果未确认，请先在 ${job.provider==='openlux'?'OpenLux':'DREO'} 核对任务；不会自动重复提交` : error.code === 'LOCAL_SAVE_FAILED' ? '本地任务记录暂时无法保存，本次尚未提交生图；请稍后重试' : error.message
   try { await save(job) } catch { job.warning = '本地保存暂时失败，已保留恢复文件，请保持服务运行' }
   if (job.taskId) monitor(job.id)
 }
@@ -97,7 +101,10 @@ async function dreo(method, endpoint, body) {
   const c = await config(); const url = new URL(c.origin)
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw Error('DREO origin 无效')
   const res = await fetch(`${c.origin.replace(/\/$/, '')}/api/agent${endpoint}`, { method, headers: { Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(45000), redirect: 'error' })
-  if (!res.ok) throw Object.assign(Error(`DREO 请求失败（HTTP ${res.status}）`),{status:res.status})
+  if (!res.ok) {
+    const detail=res.status===422?dreoValidationSummary((await res.text()).slice(0,16000)):''
+    throw Object.assign(Error(`DREO 请求失败（HTTP ${res.status}）${detail?'；'+detail:''}`),{status:res.status})
+  }
   return res.json()
 }
 async function preprocess(image) {
@@ -137,9 +144,9 @@ function ratioFor(width, height) {
   if (!ratio) throw Error('底图不是模型支持的标准比例，请先调整底图；不会自动裁切')
   return ratio
 }
-async function downloadImage(url) {
-  const c = await config(), parsed = new URL(url, c.origin)
-  if (parsed.username || parsed.password || (parsed.protocol !== 'https:' && parsed.origin !== new URL(c.origin).origin)) throw Error('结果下载地址无效')
+async function downloadImage(url,origin) {
+  const base=origin||(await config()).origin, parsed = new URL(url, base)
+  if (parsed.username || parsed.password || (parsed.protocol !== 'https:' && parsed.origin !== new URL(base).origin)) throw Error('结果下载地址无效')
   // Signed output URLs never receive the personal Bearer token.
   const response = await fetch(parsed, { signal: AbortSignal.timeout(60000), redirect: 'error' })
   if (!response.ok) throw Error(`结果下载失败（HTTP ${response.status}）`)
@@ -167,11 +174,19 @@ async function whiteBackgroundResult(job, source) {
   await save(job)
   return null
 }
-const syncSeparation=separationRunner({active,save,load,vision,imageRequest,submitImage,syncJob,submitNative:submitNativeSeparation,fetchNativeTask:id=>dreo('GET',`/tasks/${encodeURIComponent(id)}`),downloadImage,cutout:localCutout,imageTool:assetImageTool,capabilities:()=>dreo('GET','/capabilities'),deleted:id=>deletedJobs.has(id)})
+const syncSeparation=separationRunner({active,save,load,vision,imageRequest,submitImage,syncJob,submitNative:submitNativeSeparation,fetchNativeTask:id=>dreo('GET',`/tasks/${encodeURIComponent(id)}`),downloadImage:async(url,job)=>downloadImage(url,job.separation?.provider==='openlux'?(await openLuxConfig()).origin:undefined),cutout:localCutout,imageTool:assetImageTool,capabilities:()=>dreo('GET','/capabilities'),deleted:id=>deletedJobs.has(id)})
 async function syncJob(job) {
   if(job.deletedAt||deletedJobs.has(job.id))return {...job,status:"paused",message:"任务已删除",images:[]}
   if(job.provider==='liblib')return localLiblib.sync(job)
   if(job.separation)return syncSeparation(job)
+  if(job.openluxEdit){
+    if(['complete','submit_error'].includes(job.status)||active.has(job.id))return job
+    if(!job.openluxEdit.resultUrl){job.status='needs_attention';job.message='OpenLux 提交结果尚未确认，接口没有可查询的任务 ID；请在中转站核对，不会自动重新提交';await save(job);return job}
+    active.add(job.id)
+    try{await finishOpenLuxInteractive(job)}catch{job.status='needs_attention';job.message='OpenLux 已返回图片，但下载失败；查询原任务只会重试下载，不会重新生图';await save(job)}
+    finally{active.delete(job.id)}
+    return job
+  }
   if (!job.taskId || active.has(job.id) || job.status==='paused' || job.status==='complete' && (!(job.personAsset||job.assetCandidate) || job.asset || job.assetDraft)) return job
   active.add(job.id)
   try {
@@ -283,7 +298,59 @@ async function submitImage(job, body, request) {
   } catch (cause) { await submissionFailure(job, cause, attempted) }
   finally { active.delete(job.id) }
 }
+async function finishOpenLuxInteractive(job){
+  const config=await openLuxConfig()
+  if(!config)throw Error('OpenLux 本机配置不存在')
+  const src=await downloadImage(job.openluxEdit.resultUrl,config.origin)
+  if(deletedJobs.has(job.id))return
+  job.images=[{index:0,src,review:{geometry:'框选坐标已提交；结果需人工复核',protection:'模型局部编辑结果，未框选区域请人工复核'}}]
+  job.status='complete';job.message='框选编辑已完成，请核对区域边缘与未选中内容';job.finishedAt=new Date().toISOString();await save(job)
+}
+async function submitOpenLuxInteractive(job,base,prompt,resolution){
+  let attempted=false
+  active.add(job.id)
+  try{
+    const config=await openLuxConfig()
+    if(!config)throw Error('OpenLux 本机配置不存在')
+    job.status='uploading';job.message='正在准备框选编辑原图';await save(job)
+    const prepared=await prepareReference(base,{max_pixels:36_000_000,max_edge:6000,max_bytes:30_000_000},{forcePng:!/^data:image\/(?:png|jpeg);base64,/.test(base)})
+    job.referencePreparation=[{originalWidth:prepared.originalWidth,originalHeight:prepared.originalHeight,width:prepared.width,height:prepared.height,resized:prepared.resized}]
+    job.status='submitting';job.message='正在通过 OpenLux 提交框选编辑';job.submissionAttemptedAt=new Date().toISOString();await save(job)
+    attempted=true
+    if(deletedJobs.has(job.id))return
+    const result=await submitOpenLuxEdit(config,prepared.image,prompt,resolution)
+    job.openluxEdit.resultUrl=result.url;job.status='download_pending';job.message='已生成图片，正在下载保存';await save(job)
+    await finishOpenLuxInteractive(job)
+  }catch(error){
+    if(job.openluxEdit.resultUrl){job.status='needs_attention';job.message='OpenLux 已返回图片，但下载失败；查询原任务只会重试下载，不会重新生图';await save(job)}
+    else if(attempted&&[400,401,403,404,415,422].includes(error.status)){
+      job.status='submit_error';job.message=safeTaskMessage(error.message);await save(job)
+    }else await submissionFailure(job,error,attempted)
+  }finally{active.delete(job.id)}
+}
 async function submitNativeSeparation(job,body,request){
+  if(job.separation?.provider==='openlux'){
+    let attempted=false
+    try{
+      const config=await openLuxConfig()
+      if(!config)throw Error('OpenLux 本机配置不存在')
+      job.status='uploading';job.message='正在准备原生拆层图片';await save(job)
+      const prepared=await prepareReference(body.images[0],{max_pixels:36_000_000,max_edge:6000,max_bytes:30_000_000},{forcePng:!/^data:image\/(?:png|jpeg);base64,/.test(body.images[0])})
+      job.referencePreparation=[{originalWidth:prepared.originalWidth,originalHeight:prepared.originalHeight,width:prepared.width,height:prepared.height,resized:prepared.resized}]
+      job.status='submitting';job.message='正在通过 OpenLux 拆分原图';job.submissionAttemptedAt=new Date().toISOString();await save(job)
+      attempted=true
+      if(deletedJobs.has(job.id))return
+      job.separation.openluxResult=await submitOpenLuxNative(config,prepared.image,body.prompt)
+      job.status='running';job.message='OpenLux 已返回底图和对象图层，正在保存透明图片';await save(job);monitor(job.id)
+    }catch(error){
+      if(attempted&&!job.separation.openluxResult&&[400,401,403,404,415,422].includes(error.status)){
+        job.failure={stage:'rejected',httpStatus:error.status,message:safeTaskMessage(error.message),at:new Date().toISOString(),previousStatus:job.status}
+        job.status='submit_error';job.message=`OpenLux 拒绝了原生图层拆分请求（HTTP ${error.status}），未返回图层；不会自动重提。${error.message.includes('；')?'；校验详情：'+safeTaskMessage(error.message.split('；').slice(1).join('；')):''}`
+        await save(job)
+      }else await submissionFailure(job,error,attempted)
+    }
+    return
+  }
   let attempted=false
   try{
     job.status='uploading';job.message='正在上传待拆分原图';await save(job)
@@ -304,7 +371,7 @@ async function submitNativeSeparation(job,body,request){
     if(attempted&&!job.taskId&&[400,404,415,422].includes(error.status)){
       job.failure={stage:'rejected',httpStatus:error.status,message:safeTaskMessage(error.message),at:new Date().toISOString(),previousStatus:job.status}
       job.status='submit_error'
-      job.message=`DREO 拒绝了原生图层拆分请求（HTTP ${error.status}），未返回任务号。请核对 DREO 任务接口是否支持图层拆分参数；不会自动重提。`
+      job.message=`DREO 拒绝了原生图层拆分请求（HTTP ${error.status}），未返回任务号。请核对 DREO 任务接口是否支持图层拆分参数；不会自动重提。${error.status===422&&error.message.includes('；')?'；校验详情：'+safeTaskMessage(error.message.split('；').slice(1).join('；')):''}`
       await save(job)
     }else await submissionFailure(job,error,attempted)
   }
@@ -330,7 +397,7 @@ async function executeSkill(job, body, routes) {
   } catch (error) { await submissionFailure(job, error, false) }
   finally { active.delete(job.id) }
 }
-function publicJob(job) { return { id: job.id, createdAt: job.createdAt, finishedAt: job.finishedAt, serverNow: new Date().toISOString(), status: job.status, message: /EPERM|EACCES|EBUSY|operation not permitted/.test(job.message || '') ? '本地任务记录保存失败，请核对任务状态；不会自动重复生图' : job.message, taskId: job.taskId || job.generateUuid, provider:job.provider, warning: job.warning, phase:job.phase, resolvedRegions:job.resolvedRegions, separationPlan:job.separation?.plan, images: job.images, asset:job.asset, ratio: job.ratio, skillVersion: job.canvasSkill?.version || job.rules?.version || 1, skillHash:job.canvasSkill?.hash, adjustments: job.plan?.adjustments || [] } }
+function publicJob(job) { return { id: job.id, createdAt: job.createdAt, finishedAt: job.finishedAt, serverNow: new Date().toISOString(), status: job.status, message: /EPERM|EACCES|EBUSY|operation not permitted/.test(job.message || '') ? '本地任务记录保存失败，请核对任务状态；不会自动重复生图' : job.message, taskId: job.taskId || job.generateUuid, provider:job.provider, canQueryOriginal:job.openluxEdit?!!(job.openluxEdit.resultUrl||active.has(job.id)):undefined, warning: job.warning, phase:job.phase, resolvedRegions:job.resolvedRegions, separationPlan:job.separation?.plan, images: job.images, asset:job.asset, ratio: job.ratio, skillVersion: job.canvasSkill?.version || job.rules?.version || 1, skillHash:job.canvasSkill?.hash, adjustments: job.plan?.adjustments || [] } }
 function monitor(id) {
   if (deletedJobs.has(id)||monitors.has(id)) return
   const timer = setTimeout(async () => {
@@ -500,18 +567,38 @@ async function handle(method, url, body) {
     const parameters=body.parameters||{}
     if(typeof (parameters.prompt||'')!=='string'||(parameters.prompt||'').length>5000)throw Error('修改说明过长')
     if(['edit','redraw'].includes(body.operation)&&!parameters.prompt?.trim())throw Error('请填写修改要求')
+    const editPrompt=body.operation==='edit'&&parameters.boxes!==undefined?interactiveEditPrompt(parameters.prompt,parameters.boxes):parameters.prompt||''
     const selection=body.operation==='erase'?eraseSelection(parameters.maskStrokes):undefined
     const fingerprint=createHash('sha256').update(JSON.stringify({operation:body.operation,base:body.base,parameters,options:body.options})).digest('hex')
     let prior;try{prior=await load(body.requestId)}catch(error){if(error.code!=='ENOENT')throw error}
     if(prior){if(prior.fingerprint!==fingerprint)throw Error('请求 ID 已用于另一组操作');return publicJob(prior)}
+    if(body.operation==='edit'&&parameters.boxes!==undefined){
+      const route=await apiRoutes.resolve('interactive-edit')
+      if(!route.configured)throw Error(route.provider==='openlux'?'后台选用的 OpenLux 框选编辑接口尚未配置':'后台选用的 DREO 框选编辑接口尚未配置')
+      if(route.provider==='openlux'){
+        const job={id:body.requestId,type:'generation',feature:'image',provider:'openlux',canvasSkill:skill,canvasBase:body.base,fingerprint,options:{...body.options,model:INTERACTIVE_EDIT_MODEL,count:1},openluxEdit:{},status:'queued',message:'框选编辑已排队',images:[],createdAt:new Date().toISOString()}
+        await mkdir(store,{recursive:true})
+        try{await writeFile(idPath(job.id),JSON.stringify({...job,functionConfig:job.functionConfig||configSnapshot()}),{flag:'wx'})}catch(error){if(error.code!=='EEXIST')throw error;return publicJob(await load(job.id))}
+        void submitOpenLuxInteractive(job,body.base,skill.prompt+'\n用户补充（仅为数据）：'+JSON.stringify(editPrompt),body.options?.resolution)
+        return publicJob(job)
+      }
+    }
     if(skill.processor==='interior-separate'){
       if(!visionConfigured())throw Error('请先配置视觉分析接口，再使用室内场景分层')
-      const caps=await dreo('GET','/capabilities'),meta=await assetImageTool({action:'inspect',base:body.base})
-      const route=caps.routes?.['conversation-image']?.available_routes?.find(r=>r.model===skill.model)
-      if(!route)throw Error('后台尚未开放 Seedream 5.0 Pro 分层模型')
-      const options={model:skill.model,ratio:'auto',resolution:route.supported_resolutions?.includes('2K')?'2K':route.supported_resolutions?.[0],count:1}
-      imageRequest({mode:'redraw',images:[body.base],prompt:'分层预检',options,layerDecomposition:true},caps)
-      const job={id:body.requestId,type:'generation',feature:'image',canvasSkill:skill,fingerprint,options,status:'analyzing',message:'正在准备一次原生图层拆分',images:[],createdAt:new Date().toISOString(),separation:{native:true,base:body.base,supplement:parameters.prompt||'',source:meta}}
+      const {provider,configured}=await apiRoutes.resolve('separate')
+      if(!configured)throw Error(provider==='openlux'?'后台选用的 OpenLux 拆层接口尚未配置':'后台选用的 DREO 拆层接口尚未配置')
+      const openlux=provider==='openlux'?await openLuxConfig():null
+      const meta=await assetImageTool({action:'inspect',base:body.base})
+      if(openlux&&(meta.width*meta.height<262144||meta.width*meta.height>36_000_000))throw Error('原生拆层输入图须为 512×512 至 3600 万像素')
+      let options={model:skill.model,ratio:'auto',resolution:'2K',count:1}
+      if(!openlux){
+        const caps=await dreo('GET','/capabilities')
+        const route=caps.routes?.['conversation-image']?.available_routes?.find(r=>r.model===skill.model)
+        if(!route)throw Error('后台尚未开放 Seedream 5.0 Pro 分层模型')
+        options={...options,resolution:route.supported_resolutions?.includes('2K')?'2K':route.supported_resolutions?.[0]}
+        imageRequest({mode:'redraw',images:[body.base],prompt:'分层预检',options,layerDecomposition:true},caps)
+      }
+      const job={id:body.requestId,type:'generation',feature:'image',provider:openlux?'openlux':undefined,canvasSkill:skill,fingerprint,options,status:'analyzing',message:'正在准备一次原生图层拆分',images:[],createdAt:new Date().toISOString(),separation:{native:true,provider,base:body.base,supplement:parameters.prompt||'',source:meta}}
       await mkdir(store,{recursive:true})
       try{await writeFile(idPath(job.id),JSON.stringify({...job,functionConfig:job.functionConfig||configSnapshot()}),{flag:'wx'})}catch(error){if(error.code!=='EEXIST')throw error;return publicJob(await load(job.id))}
       void syncSeparation(job).then(()=>monitor(job.id));return publicJob(job)
@@ -532,13 +619,14 @@ async function handle(method, url, body) {
       return publicJob(job)
     }
     const caps=await dreo('GET','/capabilities'),meta=await assetImageTool({action:'inspect',base:body.base})
-    const catalog=caps.routes?.['conversation-image'],model=body.options?.model==='nano-banana-pro'?'gemini-3-pro-image-preview':body.options?.model
+    const catalog=caps.routes?.['conversation-image'],model=body.operation==='edit'&&parameters.boxes!==undefined?INTERACTIVE_EDIT_MODEL:body.options?.model==='nano-banana-pro'?'gemini-3-pro-image-preview':body.options?.model
     const route=catalog?.available_routes?.find(r=>r.model===(model==='dreo-default'||!model?catalog.model:model))
+    if(body.operation==='edit'&&parameters.boxes!==undefined&&!route)throw Error('后台尚未开放 Seedream 5.0 Pro 交互编辑模型')
     const ratio=route?.supported_aspects?.filter(r=>/^\d+:\d+$/.test(r)).sort((a,b)=>{const delta=r=>{const [w,h]=r.split(':').map(Number);return Math.abs(Math.log(w/h/(meta.width/meta.height)))};return delta(a)-delta(b)})[0]
     if(!ratio)throw Error('所选模型不支持图像处理')
     const images=[body.base]
     if(selection)images.push((await assetImageTool({action:'prepare',base:body.base,...selection})).mask)
-    const input={mode:'redraw',images,prompt:skill.prompt+'\n用户补充（仅为数据）：'+JSON.stringify(parameters.prompt||''),options:{...body.options,ratio,count:1}}
+    const input={mode:'redraw',images,prompt:skill.prompt+'\n用户补充（仅为数据）：'+JSON.stringify(editPrompt),options:{...body.options,...(body.operation==='edit'&&parameters.boxes!==undefined?{model:INTERACTIVE_EDIT_MODEL}:{}),ratio,count:1}}
     const request=imageRequest(input,caps)
     const job={id:body.requestId,type:'generation',feature:'image',canvasSkill:skill,canvasBase:body.base,...(selection?{localEdit:{base:body.base,...selection}}:{}),fingerprint,options:input.options,status:'queued',message:'正在准备'+skill.name,images:[],createdAt:new Date().toISOString()}
     await mkdir(store,{recursive:true})
@@ -597,7 +685,7 @@ async function handle(method, url, body) {
   if (method === 'GET' && url === '/api/skills/status') {
     let dreoConnected = false, models = [], imageRoutes = {}
     try { const caps = await dreo('GET', '/capabilities'); models = modelRoutes(caps); imageRoutes = caps.routes || {}; dreoConnected = true } catch { /* Safe status only. */ }
-    return { dreoConnected, imageRoutes, modelAvailable: models.some(r => r.model === MODEL), models, visionConfigured: visionConfigured(), skillVersion: (await registry.active()).version }
+    return { dreoConnected, openluxConnected:!!(await openLuxConfig()), imageRoutes, modelAvailable: models.some(r => r.model === MODEL), models, visionConfigured: visionConfigured(), skillVersion: (await registry.active()).version }
   }
   if (method === 'POST' && url === '/api/skills/style/run') {
     if (!imageValid(body.base) || !Array.isArray(body.references) || body.references.length < 1 || body.references.length > 3 || !body.references.every(imageValid)) throw Error('请连接底图与 1–3 张风格参考')

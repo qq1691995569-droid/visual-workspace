@@ -3,8 +3,17 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 're
 import { createPortal } from 'react-dom'
 import { Check, Expand, Eraser, PencilLine, X, Undo2 } from 'lucide-react'
 import { builtinSkills, type BuiltinOperation, type InlineParameters } from './builtinSkills'
+import { InteractiveImageEdit } from './InteractiveImageEdit'
 
-export function InlineImageEdit({ anchor, sourceLabel, sourceImage, operation, revision, onCancel, onConfirm }: {
+export function InlineImageEdit({ anchor, sourceLabel, sourceImage, operation, revision, crop, onCancel, onConfirm }: {
+  anchor: RefObject<HTMLDivElement | null>; sourceLabel?:string; sourceImage?:string; operation: BuiltinOperation; revision: string; crop?:{x:number;y:number;width:number;height:number;frameWidth:number;frameHeight:number}
+  onCancel: () => void; onConfirm: (parameters: InlineParameters) => void
+}) {
+  if(operation==='edit')return <InteractiveImageEdit anchor={anchor} revision={revision} crop={crop} onCancel={onCancel} onConfirm={onConfirm}/>
+  return <LegacyInlineImageEdit anchor={anchor} sourceLabel={sourceLabel} sourceImage={sourceImage} operation={operation} revision={revision} onCancel={onCancel} onConfirm={onConfirm}/>
+}
+
+function LegacyInlineImageEdit({ anchor, sourceLabel, sourceImage, operation, revision, onCancel, onConfirm }: {
   anchor: RefObject<HTMLDivElement | null>; sourceLabel?:string; sourceImage?:string; operation: BuiltinOperation; revision: string
   onCancel: () => void; onConfirm: (parameters: InlineParameters) => void
 }) {

@@ -1,6 +1,7 @@
 import {taskMonitor} from './task-monitor.mjs'
 import {upscaleAdmin} from './upscale-admin.mjs'
 import {sharingAdmin} from './upscale-sharing.mjs'
+import {apiRoutingStore} from './api-routing.mjs'
 import {builtinRuleReferences} from './config-rule-reference.mjs'
 import {fileURLToPath} from 'node:url'
 import {readFile,mkdir,writeFile} from 'node:fs/promises'
@@ -12,6 +13,7 @@ const directory=process.env.CANVAS_DATA_DIR||fileURLToPath(new URL('../.canvas-d
 export const functionStore=configStore(directory,{fetchRemote:fetchPublished,publishRemote:publishConfig})
 const upscaleManagement=upscaleAdmin(directory)
 const sharingManagement=sharingAdmin(directory)
+export const apiRoutes=apiRoutingStore(directory)
 export async function adminKey(){
  const file=path.join(directory,'config-admin-key.txt')
  try{return (await readFile(file,'utf8')).trim()}catch(e){if(e.code!=='ENOENT')throw e}
@@ -20,11 +22,13 @@ export async function adminKey(){
  return (await readFile(file,'utf8')).trim()
 }
 export function sameKey(actual,expected){const a=Buffer.from(actual||''),b=Buffer.from(expected);return a.length===b.length&&timingSafeEqual(a,b)}
-export function adminManagement({store=functionStore,getKey=adminKey}={}){return async function(req,res,body){
+export function adminManagement({store=functionStore,getKey=adminKey,routes=apiRoutes}={}){return async function(req,res,body){
  const key=req.headers.authorization?.replace(/^Bearer /,'')
  if(!key)throw Object.assign(Error('请输入本机管理口令'),{status:401})
  if(!sameKey(key,await getKey()))throw Object.assign(Error('管理口令无效'),{status:403})
  const route=req.url
+ if(req.method==='GET'&&route==='/api/skills/config-admin/api-routing')return routes.get()
+ if(req.method==='POST'&&route==='/api/skills/config-admin/api-routing')return routes.set(body?.feature,body?.provider)
  if(req.method==='GET'&&route==='/api/skills/config-admin/upscale-sharing')return sharingManagement.get()
  if(req.method==='POST'&&/^\/api\/skills\/config-admin\/upscale-sharing\/(create|revoke)$/.test(route))return sharingManagement.mutate(route.split('/').at(-1),body)
  if(req.method==='GET'&&route==='/api/skills/config-admin/upscale')return upscaleManagement.get()

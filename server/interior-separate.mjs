@@ -52,22 +52,23 @@ async function runNativeSeparation(d,job){
     if(count>16)throw Error(`识别出 ${count} 个独立对象，豆包原生一次最多拆 16 层；请缩小拆分范围，未自动省略对象或提交付费任务`)
     await d.save(job)
   }
-  if(!job.taskId){
+  if(!job.taskId&&!state.openluxResult){
     const rejected=job.failure?.httpStatus||Number(job.failure?.message?.match(/HTTP (400|404|415|422)/)?.[1])
     if([400,404,415,422].includes(rejected)){
+      const provider=state.provider==='openlux'?'OpenLux':'DREO'
       job.failure.stage='rejected';job.failure.httpStatus=rejected
-      job.status='submit_error';job.message=`DREO 拒绝了原生图层拆分请求（HTTP ${rejected}），未返回任务号。请核对 DREO 任务接口是否支持图层拆分参数；不会自动重提。`
+      job.status='submit_error';job.message=`${provider} 拒绝了原生图层拆分请求（HTTP ${rejected}），未返回任务号；不会自动重提。`
       await d.save(job);return
     }
-    if(job.submissionAttemptedAt){job.status='submission_unknown';job.message='上次提交结果未确认，请在 DREO 核对原任务；不会重复提交';await d.save(job);return}
+    if(job.submissionAttemptedAt){job.status='submission_unknown';job.message='上次提交结果未确认，请核对原任务；不会重复提交';await d.save(job);return}
     const prompt=nativeSeparationPrompt(job.canvasSkill,state.plan)
     const input={mode:'redraw',images:[state.base],prompt,options:job.options,layerDecomposition:true}
-    const request=d.imageRequest(input,await d.capabilities())
+    const request=state.provider==='openlux'?null:d.imageRequest(input,await d.capabilities())
     await d.submitNative(job,input,request)
     return
   }
   let task
-  try{task=await d.fetchNativeTask(job.taskId);job.queryFailures=0}
+  try{task=state.openluxResult?{status:'completed',result:state.openluxResult}:await d.fetchNativeTask(job.taskId);job.queryFailures=0}
   catch{
     job.queryFailures=(job.queryFailures||0)+1
     job.status=job.queryFailures>=3?'connection_lost':'running'
@@ -83,7 +84,7 @@ async function runNativeSeparation(d,job){
     if(state.nativeOutputs.some(output=>output.zIndex===item.zIndex))continue
     let downloaded=state.nativeDownloads.find(output=>output.zIndex===item.zIndex)
     if(!downloaded){
-      try{downloaded={zIndex:item.zIndex,src:await d.downloadImage(item.url)};state.nativeDownloads.push(downloaded);await d.save(job)}
+      try{downloaded={zIndex:item.zIndex,src:await d.downloadImage(item.url,job)};state.nativeDownloads.push(downloaded);await d.save(job)}
       catch{
         state.downloadFailures=(state.downloadFailures||0)+1
         job.status=state.downloadFailures>=3?'paused':'download_pending'
@@ -101,6 +102,7 @@ async function runNativeSeparation(d,job){
   const mismatch=outputs.length-1!==expected
   job.images=outputs.map((output,index)=>({index,src:output.src,review:{layer:output.name,protection:'原图坐标透明图层；模型补全区域需复核',zIndex:String(output.zIndex),boundingBox:output.normalized?.join(',')||'',alphaValidated:output.zIndex?'true':'不适用',reviewStatus:'needs_review',description:output.description||'',resized:output.resized?'已映射回原图尺寸':'否'}}))
   job.status='complete';job.finishedAt=new Date().toISOString()
+  delete state.openluxResult
   job.message=mismatch?`原生拆分完成；清单 ${expected} 个对象，返回 ${outputs.length-1} 层，请检查遗漏或合并`:'原生拆分完成；透明图层已按原图坐标导入，请复核细节'
   await d.save(job)
 }

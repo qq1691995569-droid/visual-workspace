@@ -9,5 +9,5 @@ export const builtinSkills = {
   upscale: { name: '变清晰', interactive: false },
 } as const
 export type BuiltinOperation = keyof typeof builtinSkills
-export type InlineParameters = { prompt?: string; ratio?: string; frame?: { x: number; y: number; width: number; height: number }; maskStrokes?: number[][][] }
+export type InlineParameters = { prompt?: string; ratio?: string; frame?: { x: number; y: number; width: number; height: number }; maskStrokes?: number[][][]; boxes?: [number, number, number, number][] }
 export type QuickTask = { id: string; sourceId: string; operation: BuiltinOperation; skillVersion: 1; prompt: string; parameters: InlineParameters; status: 'blocked'; message: string; createdAt: string }

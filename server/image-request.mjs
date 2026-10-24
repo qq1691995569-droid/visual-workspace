@@ -12,7 +12,7 @@ export function imageRequest(body, caps, keys = []) {
   if(body.layerDecomposition){
     if(body.mode!=='redraw'||body.images?.length!==1||model!=='doubao-seedream-5-0-pro-260628'||count!==1)throw Error('原生图层拆分只支持一张原图和 Seedream 5.0 Pro')
     if(!route.supported_resolutions?.includes(resolution))throw Error('后台未开放图层拆分所需画质')
-    return {tool_type:'conversation-image',params:{prompt:body.prompt.trim(),route_override:{provider:route.provider,model:route.model},resolution,count:1,interactive:false,layer_decomposition:true,output_format:'png',size:'auto',...(keys.length?{image_paths:keys}:{})}}
+    return {tool_type:'conversation-image',params:{prompt:body.prompt.trim(),route_override:{provider:route.provider,model:route.model},ratio:'auto',resolution,count:1,interactive:false,layer_decomposition:true,output_format:'png',...(keys.length?{image_paths:keys}:{})}}
   }
   if (!route.supported_aspects?.includes(ratio) || !route.supported_resolutions?.includes(resolution)) throw Error('所选模型不支持此比例或画质，请修改参数')
   if (!Number.isInteger(count) || count < 1 || count > 4 || count > (route.max_images_per_call || 1) || (route.supported_counts && !route.supported_counts.includes(count)) || (route.provider === 'midjourney' && count !== 4)) throw Error('所选模型不支持此张数')

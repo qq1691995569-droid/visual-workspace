@@ -43,3 +43,13 @@ test('collapsed groups do not rearrange hidden contents',()=>{
  const ns=[node('g',0,0,{data:{kind:'group',collapsed:true}}),node('a',20,50,{parentId:'g'}),node('b',30,50,{parentId:'g'})]
  assert.equal(pushNeighbours(ns,ns[1]),ns)
 })
+test('native transparent layers overlap their background without pushing it',()=>{
+ const background=node('background',0,0,{data:{kind:'image'}})
+ const layer=node('layer',0,0,{data:{kind:'image',transparentLayer:true}})
+ const nodes=[background,layer]
+ assert.equal(pushNeighbours(nodes,{...layer,position:{x:20,y:20}}),nodes)
+ assert.equal(pushNeighbours(nodes,{...background,position:{x:20,y:20}}),nodes)
+ const stack=node('stack',0,0,{data:{kind:'group',layerStack:true}})
+ const inside=node('inside',0,0,{parentId:'stack',data:{kind:'image',stackLayer:true}})
+ assert.equal(pushNeighbours([stack,inside],inside)[0],stack)
+})

@@ -48,6 +48,30 @@
 .function-admin .admin-task-item dl{display:grid;grid-template-columns:110px minmax(0,1fr);gap:8px;font-size:12px}
 .function-admin .admin-task-item dt{color:var(--ui-muted)}.function-admin .admin-task-item dd{margin:0}
 .function-admin .admin-sections{flex-wrap:wrap}
+.function-admin .admin-sections>button{flex:1 1 185px;min-width:0;padding:13px 14px}
+.function-admin .admin-api-panel{max-width:980px;margin:0 auto;padding:32px}
+.function-admin .admin-api-panel>.admin-editor-heading svg{color:var(--ui-accent)}
+.function-admin .admin-api-section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:27px 0 12px}
+.function-admin .admin-api-section-heading h3{margin:0;font-size:13px}
+.function-admin .admin-api-section-heading>span{font-size:11px;color:var(--ui-muted)}
+.function-admin .admin-api-section-heading button{display:inline-flex;align-items:center;gap:7px;font-size:11px;min-height:30px;padding:5px 10px}
+.function-admin .admin-api-connections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.function-admin .admin-api-connections>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-field)}
+.function-admin .admin-api-connections strong{font-size:12px;font-weight:600}
+.function-admin .admin-api-connections span{flex-shrink:0;font-size:11px;color:var(--ui-muted)}
+.function-admin .admin-api-connections span[data-ready=true]{color:var(--ui-accent)}
+.function-admin .admin-api-routes{display:grid;gap:10px}
+.function-admin .admin-api-route{display:grid;grid-template-columns:minmax(180px,1fr) minmax(220px,1fr);align-items:center;gap:10px 20px;padding:18px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-field)}
+.function-admin .admin-api-route-title strong,.function-admin .admin-api-route-title small{display:block}
+.function-admin .admin-api-route-title strong{font-size:13px}.function-admin .admin-api-route-title small{margin-top:3px;font-size:11px;color:var(--ui-muted)}
+.function-admin .admin-api-route-control{display:flex;align-items:center;gap:8px;min-width:0}
+.function-admin .admin-api-route-control .canvas-select{flex:1;min-width:0}
+.function-admin .admin-api-route-control button.admin-publish-button{flex-shrink:0}
+.function-admin .admin-api-fixed{justify-self:end;color:var(--ui-secondary);font-size:11px}
+.function-admin .admin-api-route-note{grid-column:1/-1;margin:0;border-left:2px solid var(--ui-accent);padding-left:10px}
+.function-admin .admin-api-footnote{border-top:1px solid var(--ui-border);padding-top:16px;margin-top:26px}
+.function-admin .admin-api-message{min-height:22px;color:var(--ui-accent)}
+@media(max-width:700px){.function-admin .admin-api-panel{padding:20px}.function-admin .admin-api-connections{grid-template-columns:1fr}.function-admin .admin-api-route{grid-template-columns:1fr}.function-admin .admin-api-fixed{justify-self:start}}
 
 /* Status stays readable in both themes, with text as well as color. */
 .function-admin [data-tone=complete]{--task-tone:#269a68}

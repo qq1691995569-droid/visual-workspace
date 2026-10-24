@@ -36,7 +36,8 @@ test('原生图层拆分只提交一张原图，不走候选张数与白底重�
  const input={prompt:'按对象拆分',mode:'redraw',images:['original'],options:{model:nativeRoute.model,ratio:'auto',resolution:'2K',count:1},layerDecomposition:true}
  const request=imageRequest(input,nativeCaps)
  assert.equal(request.params.layer_decomposition,true)
- assert.equal(request.params.size,'auto')
+ assert.equal(request.params.ratio,'auto')
+ assert.equal('size' in request.params,false)
  assert.equal(request.params.output_format,'png')
  assert.equal(request.params.count,1)
  assert.throws(()=>imageRequest({...input,images:['one','two']},nativeCaps),/一张原图/)

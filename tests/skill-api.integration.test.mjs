@@ -44,7 +44,7 @@ a=Image.new('RGB',(1024,1024),'black');a.paste(m,(0,0));a.paste(Image.new('RGB',
   await new Promise(resolve => mock.listen(0, '127.0.0.1', resolve))
   const credentials = path.join(directory, 'credentials.json')
   await writeFile(credentials, JSON.stringify({ origin: `http://127.0.0.1:${mock.address().port}`, token: 'local-test-token' }))
-  const vite = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--port', '5188', '--strictPort'], { cwd: process.cwd(), windowsHide: true, env: { ...process.env, CANVAS_DATA_DIR: path.join(directory, 'data'), CANVAS_RUNTIME_DIR: path.join(directory,'uninstalled-runtime'), CANVAS_DREO_CONFIG: credentials, CANVAS_VISION_CONFIG_PATH: '', CANVAS_VISION_ENDPOINT: `http://127.0.0.1:${mock.address().port}/vision`, CANVAS_VISION_TOKEN: 'test-vision', CANVAS_VISION_MODEL: 'mock-vision', CANVAS_PYTHON: process.env.CANVAS_PYTHON || path.join(homedir(), '.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe') }, stdio: 'ignore' })
+  const vite = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--port', '5188', '--strictPort'], { cwd: process.cwd(), windowsHide: true, env: { ...process.env, CANVAS_DATA_DIR: path.join(directory, 'data'), CANVAS_RUNTIME_DIR: path.join(directory,'uninstalled-runtime'), CANVAS_DREO_CONFIG: credentials, CANVAS_OPENLUX_CONFIG:path.join(directory,'missing-openlux.json'), CANVAS_VISION_CONFIG_PATH: '', CANVAS_VISION_ENDPOINT: `http://127.0.0.1:${mock.address().port}/vision`, CANVAS_VISION_TOKEN: 'test-vision', CANVAS_VISION_MODEL: 'mock-vision', CANVAS_PYTHON: process.env.CANVAS_PYTHON || path.join(homedir(), '.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe') }, stdio: 'ignore' })
   const endpoint = 'http://127.0.0.1:5188'
   async function call(route, body, headers = {}) { const response = await fetch(endpoint + route, { method: body ? 'POST' : 'GET', headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...headers }, body: body ? JSON.stringify(body) : undefined }); return { code: response.status, data: await response.json() } }
   try {
@@ -77,10 +77,10 @@ a=Image.new('RGB',(1024,1024),'black');a.paste(m,(0,0));a.paste(Image.new('RGB',
     assert.equal(requests[0].params.count, 4); assert.equal(requests[0].params.resolution, '2K')
     assert.equal(requests[0].params.route_override.model, model)
     assert.equal(JSON.parse(requests[0].params.prompt).product, 'preserve')
-    const initialAdmin = await call('/api/skills/admin'); assert.equal(initialAdmin.data.activeVersion, 2)
-    const published = await call('/api/skills/admin/publish', { rules: ['测试新默认规则'] }); assert.equal(published.data.activeVersion, 3)
-    assert.equal(published.data.versions.find(v => v.version === 1).rules.length, initialAdmin.data.versions.find(v => v.version === 1).rules.length)
-    await call('/api/skills/admin/activate', { version: 2 })
+    // Legacy public admin routes are intentionally closed; configuration has
+    // moved behind the independent authenticated management API.
+    assert.equal((await call('/api/skills/admin')).code,403)
+    assert.equal((await call('/api/skills/admin/publish',{rules:['测试新默认规则']})).code,403)
     const automatic = await call('/api/skills/style/run', { requestId: randomUUID(), base: png, references: [png], supplement: '把产品外壳改为蓝色，使用参考图暖光', options: { model, resolution: '1K', ratio: '16:9', count: 2 } })
     assert.equal(automatic.code, 200)
     for (let i = 0; i < 60; i++) { last = await call(`/api/skills/style/tasks/${automatic.data.id}`); if (['complete','paused'].includes(last.data.status)) break; await new Promise(resolve => setTimeout(resolve, 100)) }
@@ -91,8 +91,7 @@ a=Image.new('RGB',(1024,1024),'black');a.paste(m,(0,0));a.paste(Image.new('RGB',
     assert.equal(prompt.product, 'user_override'); assert.equal(prompt.lighting, 'user_override')
     assert.deepEqual(prompt.constraints, ['机位与家具结构保留', '产品外壳改成蓝色', '按参考图调整暖光'])
     assert.equal(prompt.skill.version, 2); assert.equal(last.data.adjustments.length, 1)
-    const audit = await call('/api/skills/admin/jobs'); assert.equal(audit.data.find(job => job.id === automatic.data.id).adjustments.length, 1)
-    assert.equal('images' in audit.data[0], false)
+    assert.equal((await call('/api/skills/admin/jobs')).code,403)
     const textBody = { requestId: randomUUID(), mode: 'generate', prompt: '白色陶瓷杯', images: [], options: { model, resolution: '2K', ratio: '1:1', count: 1, quality: 'auto' } }
     const textJob = await call('/api/skills/images/tasks', textBody); assert.equal(textJob.code, 200)
     assert.equal((await call('/api/skills/images/tasks', textBody)).data.id, textJob.data.id)
@@ -216,6 +215,15 @@ a=Image.new('RGB',(1024,1024),'black');a.paste(m,(0,0));a.paste(Image.new('RGB',
       if(operation==='separate')assert.match(last.data.images[0].review.layer,/背景/)
       assert.equal((await call('/api/skills/canvas/tasks',{...input,parameters:{prompt:'another'}})).code,400)
     }
+    const interactive={requestId:randomUUID(),operation:'edit',base:'data:image/png;base64,'+large,parameters:{prompt:'把区域 1 的沙发改成蓝色',boxes:[[120,180,640,760]]},options:{model:'dreo-default',resolution:'2K',count:4}}
+    const beforeInteractive=submitted
+    assert.equal((await call('/api/skills/canvas/tasks',{...interactive,requestId:randomUUID(),parameters:{prompt:'改色',boxes:[[640,180,120,760]]}})).code,400)
+    const interactiveJob=await call('/api/skills/canvas/tasks',interactive);assert.equal(interactiveJob.code,200,JSON.stringify(interactiveJob.data))
+    for(let i=0;i<50&&submitted===beforeInteractive;i++)await new Promise(resolve=>setTimeout(resolve,100))
+    assert.equal(submitted,beforeInteractive+1)
+    assert.equal(requests.at(-1).params.route_override.model,model)
+    assert.match(requests.at(-1).params.prompt,/<bbox>120 180 640 760<\/bbox>/)
+    assert.equal(requests.at(-1).params.count,1)
     assert.equal((await call('/api/skills/canvas/tasks',{requestId:randomUUID(),operation:'erase',base:png,parameters:{maskStrokes:[]}})).code,400)
     const deletion=await fetch(endpoint+'/api/skills/tasks/'+light.data.id,{method:'DELETE'})
     assert.equal(deletion.status,200)

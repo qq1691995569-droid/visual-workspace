@@ -2,8 +2,10 @@ import type { Node } from '@xyflow/react'
 
 /** Push neighbours within the same coordinate space, growing the parent if needed. */
 export function pushNeighbours<N extends Node>(nodes: N[], dragged: N): N[] {
-  if (dragged.data.kind === 'group') return nodes
+  // Native alpha layers are meant to overlap their background and each other.
+  if (dragged.data.kind === 'group' || dragged.data.transparentLayer || dragged.data.stackLayer) return nodes
   const parent = dragged.parentId ? nodes.find(n => n.id === dragged.parentId) : undefined
+  if (parent?.data.layerStack) return nodes
   if (dragged.parentId && (!parent || parent.data.collapsed)) return nodes
   const dimensions = (n: N) => ({ w: n.measured?.width || Number(n.style?.width) || 340, h: n.measured?.height || Number(n.style?.height) || 300 })
   const overlaps = (a: N, b: N) => {
@@ -17,7 +19,7 @@ export function pushNeighbours<N extends Node>(nodes: N[], dragged: N): N[] {
     const a = next.find(n => n.id === id)!
     for (let i = 0; i < next.length; i++) {
       const b = next[i]
-      if (b.id === a.id || b.parentId !== dragged.parentId || b.hidden || !overlaps(a, b)) continue
+      if (b.id === a.id || b.parentId !== dragged.parentId || b.hidden || b.data.transparentLayer || b.data.stackLayer || b.data.layerStack || !overlaps(a, b)) continue
       if (moved.has(b.id)) continue
       if (b.selected || b.draggable === false || b.data.kind === 'group') return nodes
       const sa = dimensions(a), sb = dimensions(b)

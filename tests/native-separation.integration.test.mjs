@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createServer} from 'node:http'
-import {mkdtemp,writeFile,rm} from 'node:fs/promises'
+import {mkdtemp,writeFile,rm,mkdir} from 'node:fs/promises'
 import {tmpdir,homedir} from 'node:os'
 import path from 'node:path'
 import {spawn,spawnSync} from 'node:child_process'
@@ -32,7 +32,7 @@ print(json.dumps({'base':encode(Image.new('RGB',(512,512),'white')),'layer':enco
   if(req.url==='/api/agent/upload'){res.end(JSON.stringify({storage_key:'original-key'}));return}
   if(req.url==='/api/agent/tasks'&&req.method==='POST'){
    submissions++;request=JSON.parse(body)
-   if(rejectNext){res.statusCode=422;res.end(JSON.stringify({error:'unsupported request'}));return}
+   if(rejectNext){res.statusCode=422;res.end(JSON.stringify({detail:[{loc:['body','params','layer_decomposition'],msg:'Extra inputs are not permitted',type:'extra_forbidden',input:'private-storage-key'}]}));return}
    res.end(JSON.stringify({task_id:'one-native-task'}));return
   }
   if(req.url==='/api/agent/tasks/one-native-task'){
@@ -45,7 +45,11 @@ print(json.dumps({'base':encode(Image.new('RGB',(512,512),'white')),'layer':enco
  const origin=`http://127.0.0.1:${mock.address().port}`
  const credentials=path.join(directory,'credentials.json')
  await writeFile(credentials,JSON.stringify({origin,token:'test-token'}))
- const vite=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','5191','--strictPort'],{cwd:process.cwd(),windowsHide:true,env:{...process.env,CANVAS_DATA_DIR:path.join(directory,'data'),CANVAS_DREO_CONFIG:credentials,CANVAS_VISION_CONFIG_PATH:'',CANVAS_VISION_ENDPOINT:origin+'/vision',CANVAS_VISION_TOKEN:'test-vision',CANVAS_VISION_MODEL:'mock',CANVAS_PYTHON:python},stdio:'ignore'})
+ const openlux=path.join(directory,'openlux.json'),data=path.join(directory,'data')
+ await writeFile(openlux,JSON.stringify({origin:origin+'/v1',token:'test-openlux-token'}))
+ await mkdir(data)
+ await writeFile(path.join(data,'api-routing.json'),JSON.stringify({schema:1,bindings:{separate:'dreo'}}))
+ const vite=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','5191','--strictPort'],{cwd:process.cwd(),windowsHide:true,env:{...process.env,CANVAS_DATA_DIR:data,CANVAS_DREO_CONFIG:credentials,CANVAS_OPENLUX_CONFIG:openlux,CANVAS_VISION_CONFIG_PATH:'',CANVAS_VISION_ENDPOINT:origin+'/vision',CANVAS_VISION_TOKEN:'test-vision',CANVAS_VISION_MODEL:'mock',CANVAS_PYTHON:python},stdio:'ignore'})
  const api='http://127.0.0.1:5191'
  async function call(route,body){const response=await fetch(api+route,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:undefined);return {status:response.status,data:await response.json()}}
  try{
@@ -60,6 +64,8 @@ print(json.dumps({'base':encode(Image.new('RGB',(512,512),'white')),'layer':enco
   assert.equal(result.status,'complete',JSON.stringify({status:result.status,message:result.message}))
   assert.equal(submissions,1)
   assert.equal(request.params.layer_decomposition,true)
+  assert.equal(request.params.ratio,'auto')
+  assert.equal('size' in request.params,false)
   assert.deepEqual(request.params.image_paths,['original-key'])
   assert.equal(result.images.length,2)
   assert.equal(result.images[1].review.boundingBox,'100,200,400,600')
@@ -71,6 +77,8 @@ print(json.dumps({'base':encode(Image.new('RGB',(512,512),'white')),'layer':enco
   for(let i=0;i<50;i++){failed=(await call('/api/skills/images/tasks/'+rejected.data.id)).data;if(failed.status==='submit_error')break;await new Promise(resolve=>setTimeout(resolve,100))}
   assert.equal(failed.status,'submit_error')
   assert.match(failed.message,/HTTP 422/)
+  assert.match(failed.message,/校验详情：字段 body.params.layer_decomposition Extra inputs are not permitted/)
+  assert.doesNotMatch(failed.message,/private-storage-key/)
   assert.equal(failed.taskId,undefined)
   assert.equal(submissions,2)
   await call('/api/skills/images/tasks/'+rejected.data.id)

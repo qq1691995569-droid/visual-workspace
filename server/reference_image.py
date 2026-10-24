@@ -16,7 +16,7 @@ w, h = image.size
 limits = body['limits']
 scale = min(1, limits['max_edge']/max(w,h), math.sqrt(limits['max_pixels']/(w*h)))
 size = (max(1, math.floor(w*scale)), max(1, math.floor(h*scale)))
-changed = size != (w,h) or len(raw) > limits['max_bytes']
+changed = size != (w,h) or len(raw) > limits['max_bytes'] or (bool(body.get('forcePng')) and image.format != 'PNG')
 if changed:
     alpha = image.mode in ('RGBA','LA') or 'transparency' in image.info
     image = image.convert('RGBA' if alpha else 'RGB')

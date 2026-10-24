@@ -33,7 +33,7 @@ import { ResultDock } from './ResultDock'
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, memo, createContext, useContext } from 'react'
 import { getViewportForBounds, ReactFlow, ReactFlowProvider, Controls, MiniMap, Position, SelectionMode, NodeResizer, useNodesState, useEdgesState, useReactFlow, useStore, useUpdateNodeInternals, addEdge, reconnectEdge, type Node, type NodeProps, type Edge, type Viewport } from '@xyflow/react'
 import { readCanvasProject, writeCanvasProject, canvasProjects, readCanvasBackup } from './canvasStorage'
-import { Undo2, Redo2, Archive, Upload, Download, Layers, WandSparkles, Plus, X, ImagePlus, Palette, Sun, Armchair, Maximize, Scan, FolderOpen, Columns2, Check, ChevronDown, ChevronUp, Group, Ungroup, GripHorizontal, MousePointer2, Map, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Undo2, Redo2, Archive, Upload, Download, Layers, WandSparkles, Plus, X, ImagePlus, Palette, Sun, Armchair, Maximize, Scan, FolderOpen, Columns2, Check, ChevronDown, ChevronUp, Group, Ungroup, GripHorizontal, MousePointer2, Map, Eye, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import '@xyflow/react/dist/style.css'
 import './App.css'
 import './WorkspaceTheme.css'
@@ -49,11 +49,12 @@ import { ToneWorkbench } from './ToneWorkbench'
 import { ImageToolbar } from './ImageToolbar'
 import { GenerationControls } from './GenerationControls'
 import { absolutePosition, groupBounds, detachGroup, nextBatchPosition, fitGroupNodes } from './graphLayout'
+import { restackLayerGroups, type StackCrop } from './layerStack'
 import { defaultGeneration, normalizeGeneration, modelOptions, targetDimensions, type Generation } from './generation'
 
 const tools = [
   {id:'texture-restore',name:'图片重绘',detail:'线稿锁定构图 · 还原材质与光影',icon:WandSparkles},
-  { id: 'edit', name: '图片编辑', detail: '填写针对当前图片的修改要求', icon: WandSparkles },
+  { id: 'edit', name: '图片编辑', detail: '框选原图中的区域，填写修改要求', icon: WandSparkles },
   { id: 'separate', name: '多图层', detail: '按独立对象拆分室内场景，保留背景与透明图层', icon: Layers },
   { id: 'background', name: '去背景', detail: '分离图片主体与背景', icon: Scan },
   { id: 'erase', name: '消除', detail: '描述需要移除的局部元素', icon: Scan },
@@ -73,12 +74,16 @@ const skillIds = ['texture-restore','tone-skill', 'style', 'material', 'light', 
 // Keep the image entry first. Append newly released canvas features to this order.
 // Features from the initial release retain their relative order.
 const canvasToolOrder = ['redraw', 'generate', 'material', 'style', 'light', 'furniture', 'tone-skill', 'platform-upscale', 'texture-restore']
+const canvasTaskLabels: Record<BuiltinOperation, string> = {
+  'white-background': '制作纯白背景', edit: '编辑图片', redraw: '引用生成', separate: '拆分图层',
+  background: '去背景', erase: '消除', expand: '扩图', upscale: '变清晰',
+}
 // Legacy tools remain readable in saved projects, but never appear as duplicate creation entries.
 const sidebarTools = tools.filter(tool => canvasToolOrder.includes(tool.id)).sort((a,b)=>canvasToolOrder.indexOf(a.id)-canvasToolOrder.indexOf(b.id)).map(tool => skillIds.includes(tool.id) ? { ...tool, name: tool.name, detail: tool.id === 'texture-restore' ? tool.detail : tool.id === 'tone-skill' ? '底图与参考图匹配色调 · 本地处理' : tool.id === 'style' ? '灰度与线稿控制 · 逐表面材质迁移' : ['material','furniture'].includes(tool.id) ? '点选对象 · 从资产库绑定外观' : '调整光线方向、明暗与色温' } : tool)
 
-type Card = Node<{ textureState?:TextureState; upscaleState?:UpscaleState; toneSettings?: ToneSettings; canvasImageNode?:boolean; generatedSkill?:string; canvasParameters?:InlineParameters; canvasOperation?:BuiltinOperation; extraction?:ExtractionTask; extractedAsset?:ExtractedAsset; label: string; kind: 'image' | 'tool' | 'group'; src?: string; previewSrc?: string; version?: {parentId?:string;parentLabel?:string;revision:number}; tool?: string; prompt?: string; final?: boolean; dimensions?: string; generation?: Generation; imageJob?: ImageJobState; imageOutput?: boolean; skillState?: SkillState; composerRequest?: { id: string; referenceIds?: string[]; input?: {id:string;src:string;original?:string} }; localEdit?: LocalEditRecipe; comparison?: { original: string; input?: string }; skillResult?: { jobId: string; sourceNode: string; baseId?: string; review: Record<string,string> }; refinementDraft?: { prompt: string; options: SkillOptions }; submittedRefinement?: {jobId:string;prompt:string}; iterationContext?: { modification?:string; lighting?: SkillState['lighting']; tool: string; prompt: string; referenceIds: string[]; options: SkillOptions }; pendingResult?: { jobId: string; sourceNode: string; index: number; endpoint?: 'style' | 'images'; task?: ImageJobState }; provenanceLinked?: boolean; imagePresentationVersion?: number; task?: QuickTask; collectionManaged?: boolean; collapsed?: boolean; expandedSize?: { width: number; height: number } }, 'card'>
+type Card = Node<{ textureState?:TextureState; upscaleState?:UpscaleState; toneSettings?: ToneSettings; canvasImageNode?:boolean; generatedSkill?:string; canvasParameters?:InlineParameters; canvasOperation?:BuiltinOperation; extraction?:ExtractionTask; extractedAsset?:ExtractedAsset; label: string; kind: 'image' | 'tool' | 'group'; src?: string; previewSrc?: string; version?: {parentId?:string;parentLabel?:string;revision:number}; tool?: string; prompt?: string; final?: boolean; dimensions?: string; generation?: Generation; imageJob?: ImageJobState; imageOutput?: boolean; skillState?: SkillState; composerRequest?: { id: string; referenceIds?: string[]; input?: {id:string;src:string;original?:string} }; localEdit?: LocalEditRecipe; comparison?: { original: string; input?: string }; skillResult?: { jobId: string; sourceNode: string; baseId?: string; review: Record<string,string> }; refinementDraft?: { prompt: string; options: SkillOptions }; submittedRefinement?: {jobId:string;prompt:string}; iterationContext?: { modification?:string; lighting?: SkillState['lighting']; tool: string; prompt: string; referenceIds: string[]; options: SkillOptions }; pendingResult?: { jobId: string; sourceNode: string; index: number; endpoint?: 'style' | 'images'; task?: ImageJobState }; provenanceLinked?: boolean; imagePresentationVersion?: number; task?: QuickTask; collectionManaged?: boolean; collapsed?: boolean; expandedSize?: { width: number; height: number }; layerStack?: boolean; layerLayoutVersion?: number; stackLayer?: boolean; stackCrop?: StackCrop; transparentLayer?: boolean; layerIndex?: number }, 'card'>
 type Project = { format: 'visproj'; schemaVersion: 1; name: string; nodes: Card[]; edges: Edge[]; viewport: Viewport; draft?: { referenceIds?: string[]; prompt: string; generation: Generation; mode: 'generate' | 'redraw' } }
-const Actions = createContext<{ skillResults: (id: string, job: string, images: SkillResult[]) => void; update: (id: string, data: Partial<Card['data']>) => void; run: (id: string) => void; addTool: (tool: string, source: string) => void; toggle: (id: string) => void; ungroup: (id: string) => void; select: (id: string) => void; quick: (operation: string, id: string) => void; editing: { id: string; operation: BuiltinOperation } | null; cancelEdit: () => void; confirmEdit: (parameters: InlineParameters) => void }>({ skillResults: () => {}, update: () => {}, run: () => {}, addTool: () => {}, toggle: () => {}, ungroup: () => {}, select: () => {}, quick: () => {}, editing: null, cancelEdit: () => {}, confirmEdit: () => {} })
+const Actions = createContext<{ skillResults: (id: string, job: string, images: SkillResult[]) => void; update: (id: string, data: Partial<Card['data']>) => void; run: (id: string) => void; addTool: (tool: string, source: string) => void; toggle: (id: string) => void; ungroup: (id: string) => void; select: (id: string) => void; selectLayer: (id: string) => void; quick: (operation: string, id: string) => void; editing: { id: string; operation: BuiltinOperation } | null; cancelEdit: () => void; confirmEdit: (parameters: InlineParameters) => void }>({ skillResults: () => {}, update: () => {}, run: () => {}, addTool: () => {}, toggle: () => {}, ungroup: () => {}, select: () => {}, selectLayer: () => {}, quick: () => {}, editing: null, cancelEdit: () => {}, confirmEdit: () => {} })
 const uid = () => crypto.randomUUID()
 function download(content: Blob | string, filename: string) {
   const url = typeof content === 'string' ? content : URL.createObjectURL(content)
@@ -114,21 +119,23 @@ function validate(raw: unknown): Project {
     if (n.parentId && !p.nodes.some(parent => parent.id === n.parentId && parent.data.kind === 'group' && !parent.parentId)) throw Error('分组引用无效')
     if (n.data.kind === 'group') { if (n.parentId) throw Error('暂不支持嵌套分组'); n.deletable = false; n.dragHandle = '.group-heading' }
   }
-  p.nodes = [...p.nodes.filter(n => n.data.kind === 'group'), ...p.nodes.filter(n => n.data.kind !== 'group')]
+  p.nodes = restackLayerGroups([...p.nodes.filter(n => n.data.kind === 'group'), ...p.nodes.filter(n => n.data.kind !== 'group')])
   if (p.edges.some(e => typeof e.id !== 'string' || !ids.has(e.source) || !ids.has(e.target) || e.source === e.target)) throw Error('项目连线无效')
   if (!p.viewport || !Number.isFinite(p.viewport.x) || !Number.isFinite(p.viewport.y) || !Number.isFinite(p.viewport.zoom) || p.viewport.zoom <= 0) throw Error('项目视图数据无效')
   return p
 }
 function CardNode({ id, data, selected, positionAbsoluteX, positionAbsoluteY, width = 340, height = 340 }: NodeProps<Card>) {
+  const flow = useReactFlow<Card>()
   const singleSelected = useStore(state=>selected&&state.nodes.filter(n=>n.selected).length===1)
   // Panning only affects overlays on the selected image, not every node body.
   const transform = useStore(state => singleSelected ? state.transform : [0, 0, data.kind === 'tool' ? state.transform[2] : 1], (a,b)=>a[0]===b[0]&&a[1]===b[1]&&a[2]===b[2])
   const nodeViewport = {x:transform[0],y:transform[1],zoom:transform[2]}
   const cardRef = useRef<HTMLDivElement>(null)
   const [resizingImage, setResizingImage] = useState(false)
-  const { skillResults, update, run, toggle, ungroup, select, quick, editing, cancelEdit, confirmEdit } = useContext(Actions)
+  const [layerListOpen, setLayerListOpen] = useState(false)
+  const { skillResults, update, run, toggle, ungroup, select, selectLayer, quick, editing, cancelEdit, confirmEdit } = useContext(Actions)
   const allEdges = useStore(state=>data.kind==='tool'?state.edges.filter(e=>e.target===id):[], (a,b)=>a.length===b.length&&a.every((e,i)=>e.id===b[i].id&&e.source===b[i].source&&e.targetHandle===b[i].targetHandle))
-  const allNodes = useStore(state=>(data.kind==='group'?state.nodes.filter(n=>n.parentId===id):allEdges.map(e=>state.nodeLookup.get(e.source)).filter(Boolean)) as Card[], (a,b)=>a.length===b.length&&a.every((n,i)=>n.id===b[i].id&&n.data===b[i].data&&n.parentId===b[i].parentId))
+  const allNodes = useStore(state=>(data.kind==='group'?state.nodes.filter(n=>n.parentId===id):allEdges.map(e=>state.nodeLookup.get(e.source)).filter(Boolean)) as Card[], (a,b)=>a.length===b.length&&a.every((n,i)=>n.id===b[i].id&&n.data===b[i].data&&n.parentId===b[i].parentId&&n.selected===b[i].selected))
   const internals = useUpdateNodeInternals()
   useEffect(() => { internals(id) }, [id, data.collapsed, internals])
   // Only the second tool input changes its offset with zoom. Measure once after zoom settles.
@@ -158,9 +165,14 @@ function CardNode({ id, data, selected, positionAbsoluteX, positionAbsoluteY, wi
   const imageSkill = data.generatedSkill || (data.canvasOperation ? builtinSkills[data.canvasOperation]?.name : undefined) || (data.extraction || data.extractedAsset ? '资产提取' : data.localEdit ? data.localEdit.kind==='material'?'材质优化':'模型替换' : tools.find(t=>t.id===(data.iterationContext?.tool || data.tool))?.name)
   const hasImageOrigin = imageSkill || data.skillResult || data.pendingResult || data.imageJob || data.task
   const imageStatus = data.task ? '待处理' : imageTask && !['complete','completed'].includes(imageTask.status || '') ? ['paused','needs_attention','submit_error','submission_unknown','connection_lost','failed'].includes(imageTask.status || '') ? '需处理' : imageTask.status==='restoring'?'查询中':'生成中' : '已完成'
-  const imageTag = data.kind==='image' && singleSelected && !editing && hasImageOrigin ? <div className="image-origin-label" data-status={imageStatus} title={`${imageSkill || data.label} · ${imageStatus}${data.label?' · '+data.label:''}`}><ImagePlus size={13}/><span>{imageSkill || data.label || '图片生成'}</span><i/><small>{imageStatus}</small></div> : null
+  const imageTag = data.kind==='image' && !data.stackLayer && singleSelected && !editing && hasImageOrigin ? <div className="image-origin-label" data-status={imageStatus} title={`${imageSkill || data.label} · ${imageStatus}${data.label?' · '+data.label:''}`}><ImagePlus size={13}/><span>{imageSkill || data.label || '图片生成'}</span><i/><small>{imageStatus}</small></div> : null
+  const cropScale = data.stackCrop ? width / data.stackCrop.width : 1
   if (data.kind === 'group') {
     const children = allNodes.filter(n => n.parentId === id)
+    if (data.layerStack) return <div className={`workflow-group layer-stack ${selected ? 'selected' : ''}`} onClick={()=>setLayerListOpen(true)}>
+      <div className="group-heading layer-stack-heading"><Layers size={16}/><button type="button" className="layer-stack-title nodrag nopan" aria-label="查看分层图片" aria-expanded={layerListOpen} onClick={event=>{event.stopPropagation();setLayerListOpen(open=>!open)}}>多图层结果</button>{children.length===0&&<button type="button" className="nodrag nopan" aria-label="删除空多图层结果" title="删除空多图层结果" onClick={event=>{event.stopPropagation();void flow.deleteElements({nodes:[{id}]})}}><Trash2 size={14}/> 删除</button>}</div>
+      {layerListOpen && <div className="layer-stack-list nodrag nopan" role="group" aria-label="独立 PNG 图层">{children.map((child,index)=><div className="layer-stack-row" key={child.id}><button type="button" className={child.selected?'chosen':''} onClick={event=>{event.stopPropagation();selectLayer(child.id)}}><span>{String(index+1).padStart(2,'0')}</span><strong>{child.data.label}</strong>{child.selected&&<Check size={14}/>}</button><button type="button" title={`下载 ${child.data.label}`} aria-label={`下载 ${child.data.label}`} onClick={event=>{event.stopPropagation();if(child.data.src)download(child.data.src,`${child.data.label}.png`)}}><Download size={14}/></button></div>)}<button type="button" className="layer-stack-separate" onClick={event=>{event.stopPropagation();ungroup(id)}}><Ungroup size={14}/> 分开到画布</button></div>}
+    </div>
     const cover = children.find(n => n.data.final && n.data.src) || children.find(n => n.data.kind === 'image' && n.data.src && !n.data.task)
     const tasks = children.map(n => n.data.skillState?.jobId ? n.data.skillState : n.data.imageJob).filter(Boolean)
     const running = tasks.some(t => !['complete','paused','submit_error','submission_unknown'].includes(t!.status || ''))
@@ -175,17 +187,17 @@ function CardNode({ id, data, selected, positionAbsoluteX, positionAbsoluteY, wi
   if (data.kind === 'image' && data.pendingResult) {
     return <>{imageTag}<GenerationPlaceholder task={pendingJob || { status: 'restoring', message: '正在查询原任务状态，请稍候' }} index={data.pendingResult.index} action={pendingControls}><Handle type="target" position={Position.Left} />{data.imageJob && <Handle type="source" position={Position.Right} />}</GenerationPlaceholder></>
   }
-  if (data.kind === 'image') return <div ref={cardRef} style={{'--image-hover-scale':'var(--port-scale, 1)','--image-meta-scale':`min(var(--port-scale, 1), ${width/210})`} as React.CSSProperties} className={['card image clean-image', data.skillResult && !data.pendingResult && (!data.imageJob || data.imageOutput) ? 'generation-result' : '', selected ? 'active' : '', data.collapsed ? 'folded-image' : ''].join(' ')}>
+  if (data.kind === 'image') return <div ref={cardRef} style={{'--image-hover-scale':'var(--port-scale, 1)','--image-meta-scale':`min(var(--port-scale, 1), ${width/210})`} as React.CSSProperties} className={['card image clean-image', data.stackLayer ? 'stack-layer' : '', data.stackCrop ? 'stack-cropped' : '', data.skillResult && !data.pendingResult && (!data.imageJob || data.imageOutput) ? 'generation-result' : '', selected ? 'active' : '', data.collapsed ? 'folded-image' : ''].join(' ')}>
     {imageTag}
-    {selected && !editing && <span className="image-selection-badge" aria-label="图片已选中"><Check size={12} strokeWidth={2}/></span>}
-    {selected && !resizingImage && !data.task && (!data.imageJob || data.imageOutput) && !editing && singleSelected && <ImageToolbar onSaveAsset={data.extractedAsset?()=>quick('save-asset',id):undefined} assetSaved={data.extractedAsset?.archived} anchor={cardRef} revision={[positionAbsoluteX, positionAbsoluteY, nodeViewport.x, nodeViewport.y, nodeViewport.zoom, data.collapsed].join(':')} onCompare={(data.comparison?.original || data.comparison?.input || data.skillResult?.baseId || data.version?.parentId) ? ()=>quick('compare',id) : undefined} onAction={operation => quick(operation, id)} onDownload={() => data.src && download(data.src, data.label)} />}
-    {singleSelected && data.src && !data.task && (!data.imageJob || data.imageOutput) && !editing && <ImageDimensions src={data.src} previewSrc={data.previewSrc} dimensions={data.dimensions}/>}
-    <NodeResizer isVisible={singleSelected && !data.collapsed && !editing && !data.task && (!data.imageJob || data.imageOutput)} minWidth={40} minHeight={40} keepAspectRatio onResizeStart={() => setResizingImage(true)} onResizeEnd={(_, size) => { setResizingImage(false); update(id, { expandedSize: { width: size.width, height: size.height } }) }} />
+    {selected && !data.stackLayer && !editing && <span className="image-selection-badge" aria-label="图片已选中"><Check size={12} strokeWidth={2}/></span>}
+    {selected && !resizingImage && !data.task && (!data.imageJob || data.imageOutput) && !editing && singleSelected && <ImageToolbar layerMode={data.stackLayer} onSaveAsset={data.extractedAsset?()=>quick('save-asset',id):undefined} assetSaved={data.extractedAsset?.archived} anchor={cardRef} revision={[positionAbsoluteX, positionAbsoluteY, nodeViewport.x, nodeViewport.y, nodeViewport.zoom, data.collapsed].join(':')} onCompare={!data.stackLayer && (data.comparison?.original || data.comparison?.input || data.skillResult?.baseId || data.version?.parentId) ? ()=>quick('compare',id) : undefined} onAction={operation => quick(operation, id)} onDownload={() => data.src && download(data.src, data.label)} />}
+    {singleSelected && !data.stackLayer && data.src && !data.task && (!data.imageJob || data.imageOutput) && !editing && <ImageDimensions src={data.src} previewSrc={data.previewSrc} dimensions={data.dimensions}/>}
+    <NodeResizer isVisible={singleSelected && (!data.stackLayer || !!data.stackCrop) && !data.collapsed && !editing && !data.task && (!data.imageJob || data.imageOutput)} minWidth={data.stackCrop?12:40} minHeight={data.stackCrop?12:40} keepAspectRatio onResizeStart={() => setResizingImage(true)} onResizeEnd={(_, size) => { setResizingImage(false); update(id, { expandedSize: { width: size.width, height: size.height } }) }} />
     <Handle type="target" position={Position.Left} isConnectable={false} aria-hidden="true" />
-    <div className={data.task || data.imageJob && !data.imageOutput ? 'image-body task-input-preview' : 'image-body'}><CanvasImage src={data.previewSrc || data.src || ''} alt={data.task ? '输入图片预览，尚未生成结果' : data.label} width={width} height={height} /></div>
+    <div className={data.task || data.imageJob && !data.imageOutput ? 'image-body task-input-preview' : 'image-body'}>{data.stackCrop ? <span className="stack-crop-frame" style={{width:data.stackCrop.frameWidth*cropScale,height:data.stackCrop.frameHeight*cropScale,left:-data.stackCrop.x*cropScale,top:-data.stackCrop.y*cropScale}}><CanvasImage src={data.previewSrc || data.src || ''} alt={data.label} width={data.stackCrop.frameWidth*cropScale} height={data.stackCrop.frameHeight*cropScale}/></span> : <CanvasImage src={data.previewSrc || data.src || ''} alt={data.task ? '输入图片预览，尚未生成结果' : data.label} width={width} height={height} />}</div>
     {data.task && <div className="quick-task-state" role="status"><strong>{builtinSkills[data.task.operation].name}</strong><span>旧版任务，请重新发起</span><small>尚未生成 · 底图仅为输入预览</small></div>}
-    {data.imageJob && !data.imageOutput && <div className="generation-overlay"><GenerationPlaceholder task={data.imageJob} preview={data.previewSrc || data.src} frame={data.canvasParameters?.frame} operation={data.canvasOperation==='background'?'分离主体':data.canvasOperation==='expand'?'扩图':data.canvasOperation==='upscale'?'提升清晰度':data.canvasOperation==='separate'?'拆分图层':undefined} action={<ImageJobControls job={data.imageJob} onChange={imageJob=>update(id,{imageJob})}/>}/></div>}
-    {editing?.id === id && <InlineImageEdit key={editing.operation} anchor={cardRef} sourceLabel={data.label} sourceImage={data.previewSrc || data.src} operation={editing.operation} revision={[positionAbsoluteX, positionAbsoluteY, nodeViewport.x, nodeViewport.y, nodeViewport.zoom].join(':')} onCancel={cancelEdit} onConfirm={confirmEdit} />}
+    {data.imageJob && !data.imageOutput && <div className="generation-overlay"><GenerationPlaceholder task={data.imageJob} preview={data.previewSrc || data.src} frame={data.canvasParameters?.frame} operation={data.canvasOperation ? canvasTaskLabels[data.canvasOperation] : undefined} action={<ImageJobControls job={data.imageJob} onChange={imageJob=>update(id,{imageJob})}/>}/></div>}
+    {editing?.id === id && <InlineImageEdit key={editing.operation} anchor={cardRef} sourceLabel={data.label} sourceImage={data.previewSrc || data.src} operation={editing.operation} revision={[positionAbsoluteX, positionAbsoluteY, nodeViewport.x, nodeViewport.y, nodeViewport.zoom].join(':')} crop={data.stackCrop} onCancel={cancelEdit} onConfirm={confirmEdit} />}
     <Handle type="source" position={Position.Right} />
   </div>
   if(data.canvasImageNode)return <div className={`image-generator-node ${selected?'active':''}`}>
@@ -230,6 +242,7 @@ function Workspace() {
   useEffect(()=>{sessionStorage.removeItem('canvas-return-projects')},[])
   const [saveStatus, setSaveStatus] = useState('正在读取')
   const persistenceAllowed=useRef(false),hydrationFlow=useRef(flow)
+  const restackedFocus=useRef<string | undefined>(undefined)
   const [projectWriter]=useState(()=>latestProjectWriter<Project>(p=>writeCanvasProject(p),state=>setSaveStatus(state==='saved'?'已保存在此浏览器':state==='saving'?'正在保存':'保存失败，请导出备份')))
   const [toast, setToast] = useState('')
   const [assetSession, setAssetSession] = useState<AssetSession | null>(null)
@@ -432,7 +445,8 @@ function Workspace() {
   const nodeLookup = new globalThis.Map(nodes.map(n=>[n.id,n]))
   const foldedParent = (id: string) => { const n = nodeLookup.get(id); return n?.parentId && nodeLookup.get(n.parentId)?.data.collapsed ? n.parentId : undefined }
   // Hidden nodes stay in the graph store but unmount their canvas UI. Task monitors live above ReactFlow.
-  const displayNodes = nodes.map(n => legacyGeneratorIds.has(n.id) ? { ...n, hidden: true, selected: false } : foldedParent(n.id) ? { ...n, hidden: true, extent: undefined, expandParent: false, selected: false, selectable: false, draggable: false } : n)
+  const groupsWithChildren = new Set(nodes.map(n=>n.parentId).filter((id): id is string=>!!id))
+  const displayNodes = nodes.map(n => legacyGeneratorIds.has(n.id) ? { ...n, hidden: true, selected: false } : foldedParent(n.id) ? { ...n, hidden: true, extent: undefined, expandParent: false, selected: false, selectable: false, draggable: false } : n.data.kind==='group' ? {...n,deletable:!groupsWithChildren.has(n.id)} : n)
   const taskRunning = (data?: Card['data']) => {
     if (!data || data.kind==='image' && data.src && !data.pendingResult) return false
     const task = data.pendingResult ? pendingTask<ImageJobState | SkillState>(data.pendingResult.jobId,nodeLookup.get(data.pendingResult.sourceNode)?.data,data.pendingResult.task) : data.extraction || data.imageJob || data.skillState || data.task
@@ -447,7 +461,7 @@ function Workspace() {
   })
   return { displayNodes, visibleEdges }
   }, [nodes, edges, focused, selectedIds, legacyGeneratorIds])
-  useEffect(() => { let active = true; readCanvasProject().then(raw => { if (!active) return; if (raw) { const p = validate(raw); setNodes(p.nodes.map(n => n.data.skillResult ? { ...n, data: { ...n.data, provenanceLinked: true } } : n)); setEdges([...p.edges, ...p.nodes.filter(n => !n.data.provenanceLinked && n.data.skillResult && n.data.skillResult.sourceNode !== n.id && p.nodes.some(source => source.id === n.data.skillResult!.sourceNode) && !p.edges.some(e => e.id === `result-${n.id}` || e.source === n.data.skillResult!.sourceNode && e.target === n.id)).map(n => ({ id: `result-${n.id}`, source: n.data.skillResult!.sourceNode, target: n.id }))]); setName(p.name); setComposerReferenceIds(Array.isArray(p.draft?.referenceIds) ? [...new Set(p.draft.referenceIds.filter(id=>typeof id==='string'))].slice(0,9) : []); setDraftPrompt(p.draft?.prompt || ''); setDraftGeneration(normalizeGeneration(p.draft?.generation)); setDraftMode(p.draft?.mode === 'redraw' ? 'redraw' : 'generate'); setViewportState(p.viewport); void hydrationFlow.current.setViewport(p.viewport) } persistenceAllowed.current=true }).catch((error:unknown) => { if (active) {const reason=error instanceof Error?error.message:'未知读取错误';setLoadError(reason);setToast('本地项目读取失败：'+reason+'；已暂停自动保存，原记录未覆盖');setSaveStatus('读取失败：'+reason+'，自动保存已暂停')} }).finally(() => { if (active) setReady(true) }); return () => { active = false } }, [setNodes, setEdges])
+  useEffect(() => { let active = true; readCanvasProject().then(raw => { if (!active) return; if (raw) { const saved=raw as Project;restackedFocus.current=saved.nodes?.find(n=>n.data?.kind==='group'&&!n.data.layerStack&&saved.nodes.some(child=>child.parentId===n.id&&child.data?.skillResult?.review?.layer))?.id;const p = validate(raw); setNodes(p.nodes.map(n => n.data.skillResult ? { ...n, data: { ...n.data, provenanceLinked: true } } : n)); setEdges([...p.edges, ...p.nodes.filter(n => !n.data.provenanceLinked && n.data.skillResult && n.data.skillResult.sourceNode !== n.id && p.nodes.some(source => source.id === n.data.skillResult!.sourceNode) && !p.edges.some(e => e.id === `result-${n.id}` || e.source === n.data.skillResult!.sourceNode && e.target === n.id)).map(n => ({ id: `result-${n.id}`, source: n.data.skillResult!.sourceNode, target: n.id }))]); setName(p.name); setComposerReferenceIds(Array.isArray(p.draft?.referenceIds) ? [...new Set(p.draft.referenceIds.filter(id=>typeof id==='string'))].slice(0,9) : []); setDraftPrompt(p.draft?.prompt || ''); setDraftGeneration(normalizeGeneration(p.draft?.generation)); setDraftMode(p.draft?.mode === 'redraw' ? 'redraw' : 'generate'); setViewportState(p.viewport); void hydrationFlow.current.setViewport(p.viewport) } persistenceAllowed.current=true }).catch((error:unknown) => { if (active) {const reason=error instanceof Error?error.message:'未知读取错误';setLoadError(reason);setToast('本地项目读取失败：'+reason+'；已暂停自动保存，原记录未覆盖');setSaveStatus('读取失败：'+reason+'，自动保存已暂停')} }).finally(() => { if (active) setReady(true) }); return () => { active = false } }, [setNodes, setEdges])
   useEffect(() => {
     if(!ready||projectsOpen||!persistenceAllowed.current||nodes.some(n=>n.dragging||n.resizing))return
     projectWriter.enqueue({format:'visproj',schemaVersion:1,name,nodes,edges,viewport,draft:{prompt:draftPrompt,generation:draftGeneration,mode:draftMode,referenceIds:composerReferenceIds}})
@@ -483,7 +497,8 @@ function Workspace() {
     return () => window.removeEventListener('keydown', shortcut)
   }, [restoreHistory])
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(''), 6000); return () => clearTimeout(timer) }, [toast])
-  useEffect(() => { if(nodes.some(n=>n.dragging||n.resizing))return;setNodes(current => fitGroupNodes(current)) }, [nodes, setNodes])
+  useEffect(() => { if(nodes.some(n=>n.dragging||n.resizing))return;const old=nodes.find(n=>n.data.kind==='group'&&!n.data.layerStack&&nodes.some(child=>child.parentId===n.id&&child.data.skillResult?.review?.layer));if(ready&&old)restackedFocus.current=old.id;setNodes(current => fitGroupNodes(restackLayerGroups(current))) }, [nodes, ready, setNodes])
+  useEffect(()=>{const id=restackedFocus.current;if(!ready||!id)return;const group=nodes.find(n=>n.id===id&&n.data.layerStack);if(!group)return;restackedFocus.current=undefined;const sourceId=nodes.find(n=>n.parentId===id)?.data.version?.parentId;const targets=sourceId&&nodes.some(n=>n.id===sourceId)?[{id:sourceId},{id}]:[{id}];requestAnimationFrame(()=>requestAnimationFrame(()=>{void flow.fitView({nodes:targets,padding:{top:'90px',bottom:'140px',left:'90px',right:'90px'},maxZoom:1,duration:250})}))},[ready,nodes,flow])
   useEffect(() => {
     if (!ready) return
     setNodes(current => {
@@ -544,29 +559,23 @@ function Workspace() {
     const original = source.data.comparison?.original || nodes.find(n => n.id === baseId)?.data.comparison?.original || nodes.find(n => n.id === baseId)?.data.src || input
     const comparison = source.data.textureState?.base ? {original:source.data.textureState.base} : source.data.tool === 'platform-upscale' && input ? { original: input } : source.data.toneSettings?.base ? {original:source.data.toneSettings.base} : original ? { original, input } : undefined
     const results: Card[] = []
-    const decoded: HTMLImageElement[] = []
     for (const result of images) {
       const img = new Image(); img.src = result.src
       try { await img.decode() } catch { continue }
-      decoded.push(img)
       results.push({ id: `skill-${job}-${result.index}`, type: 'card', position: { x: 0, y: 0 }, style: { width: 340, height: 340 * img.naturalHeight / img.naturalWidth }, data: { kind: 'image', generatedSkill: source.data.canvasOperation ? builtinSkills[source.data.canvasOperation].name : source.data.localEdit ? source.data.localEdit.kind==='material'?'材质优化':'模型替换' : tools.find(t=>t.id===source.data.tool)?.name || '图片生成', src: result.src, toneSettings: result.toneSettings, label: `${source.data.canvasOperation ? builtinSkills[source.data.canvasOperation].name : source.data.localEdit ? source.data.localEdit.kind === 'material' ? '材质优化' : '模型替换' : source.data.tool === 'texture-restore' ? '图片重绘' : source.data.tool === 'tone-skill' ? '场景调色' : source.data.tool === 'style' ? '风格转换' : source.data.tool === 'light' ? '光影优化' : '生图结果'} ${result.index + 1}`, dimensions: `${img.naturalWidth} × ${img.naturalHeight}`, version:{parentId:versionParent?.id,parentLabel:versionParent?.data.label,revision:(versionParent?.data.version?.revision || 0)+1}, imagePresentationVersion: 1, provenanceLinked: true, comparison: result.toneSettings?.base ? {original:result.toneSettings.base} : comparison, localEdit: source.data.localEdit, iterationContext: { modification: source.data.submittedRefinement?.jobId===job ? source.data.submittedRefinement.prompt : undefined, lighting: source.data.skillState?.lighting, tool: source.data.tool || 'redraw', prompt: source.data.localEdit?.supplement || source.data.skillState?.supplement || source.data.prompt || '', referenceIds: source.data.skillState?.referenceIds || (source.data.composerRequest ? source.data.composerRequest.referenceIds || (source.data.composerRequest.input ? [source.data.composerRequest.input.id] : []) : edges.filter(e => e.target === id && e.targetHandle === 'style').map(e => e.source)), options: source.data.skillState?.options || (source.data.tool === 'style' ? { model: 'doubao-seedream-5-0-pro-260628', resolution: '2K', ratio: 'auto', count: 4 } : source.data.generation || defaultGeneration) }, skillResult: { jobId: job, sourceNode: id, baseId, review: result.review } } })
     }
     if(epoch !== graphEpoch.current)return
-    let layeredPreview: string | undefined
-    if(source.data.canvasOperation==='separate' && decoded.length===images.length && decoded.length>1 && decoded.every(img=>img.naturalWidth===decoded[0].naturalWidth&&img.naturalHeight===decoded[0].naturalHeight)){
-      const canvas=document.createElement('canvas'),scale=Math.min(1,720/Math.max(decoded[0].naturalWidth,decoded[0].naturalHeight))
-      canvas.width=Math.max(1,Math.round(decoded[0].naturalWidth*scale));canvas.height=Math.max(1,Math.round(decoded[0].naturalHeight*scale))
-      const context=canvas.getContext('2d')
-      if(context){for(const image of decoded)context.drawImage(image,0,0,canvas.width,canvas.height);layeredPreview=canvas.toDataURL('image/png')}
-    }
     if(images.some(result=>result.review?.layer) && results.length){
       if(source.data.kind==='group')return
       setNodes(current=>{
         if(!current.some(n=>n.id===id))return current
         const width=results.length*360+20,height=Math.max(...results.map(r=>Number(r.style?.height)||340))+80
         const children=results.map((r,index)=>({...r,parentId:id,extent:'parent' as const,position:{x:20+index*360,y:50},data:{...r.data,label:images[index].review.layer}}))
-        return [...current.map(n=>n.id===id?{...n,style:{width,height},deletable:false,dragHandle:'.group-heading',data:{kind:'group' as const,label:'多图层 · 原图坐标透明图层',previewSrc:layeredPreview,collectionManaged:true,expandedSize:{width,height}}}:n).filter(n=>!children.some(c=>c.id===n.id)),...children]
+        return restackLayerGroups([...current.map(n=>n.id===id?{...n,style:{width,height},deletable:false,dragHandle:'.group-heading',data:{kind:'group' as const,label:'多图层 · 原图坐标透明图层',collectionManaged:true,expandedSize:{width,height}}}:n).filter(n=>!children.some(c=>c.id===n.id)),...children])
       })
+      // The generation tool is now the visual layer group, so its old workflow
+      // handles and pending result edges no longer have endpoints.
+      setEdges(current=>current.filter(edge=>edge.source!==id&&edge.target!==id&&!results.some(result=>edge.source===result.id||edge.target===result.id)))
       return
     }
     if(deletedTaskIds.current.has(job))return
@@ -607,6 +616,7 @@ function Workspace() {
     void flow.setViewport(viewport,{duration:300})
   }
   function toggleNode(id: string) {
+    if(nodes.find(n=>n.id===id)?.data.layerStack){setToast('图层已叠在同一张图上，点击上方「多图层结果」可选择独立 PNG');return}
     setNodes(ns => {const expanding=ns.find(n=>n.id===id)?.data.collapsed;const next=ns.map(n => {
       if (n.id !== id) return n
       if (n.data.kind === 'group') { const size = n.data.expandedSize || { width: Number(n.style?.width) || n.measured?.width || 500, height: Number(n.style?.height) || n.measured?.height || 400 }; return { ...n, width: n.data.collapsed ? size.width : 280, height: n.data.collapsed ? size.height : 330, style: { ...n.style, width: n.data.collapsed ? size.width : 280, height: n.data.collapsed ? size.height : 330 }, data: { ...n.data, collectionManaged: true, collapsed: !n.data.collapsed, expandedSize: size } } }
@@ -653,7 +663,17 @@ function Workspace() {
     const map:Record<string,Arrangement>={h:'row'},action=map[event.key]||map[event.key.toLowerCase()]
     if(action){event.preventDefault();if(!event.repeat)arrangeSelection(action)}
   };window.addEventListener('keydown',handle);return()=>window.removeEventListener('keydown',handle)},[arrangeSelection,editing,previewId,assetSession])
-  function ungroup(id: string) { setNodes(ns => detachGroup(id, ns)); setToast('已取消收纳，节点恢复自由摆放，位置和连线保持不变') }
+  function ungroup(id: string) { const stack=!!nodes.find(n=>n.id===id)?.data.layerStack;setNodes(ns => {
+    const group=ns.find(n=>n.id===id)
+    const detached=detachGroup(id,ns)
+    if(!group?.data.layerStack)return detached
+    const layers=ns.filter(n=>n.parentId===id)
+    const width=Number(group.style?.width)||340
+    return detached.map(n=>{
+      const index=layers.findIndex(layer=>layer.id===n.id)
+      return index<0?n:{...n,selected:false,zIndex:undefined,position:{x:group.position.x+index*(width+40),y:group.position.y},data:{...n.data,stackLayer:false,layerIndex:undefined}}
+    })
+  }); setToast(stack?'图层已分开到画布，可分别移动和编辑':'已取消收纳，节点恢复自由摆放，位置和连线保持不变') }
   function addTool(toolId: string, at?: { x: number; y: number }, sourceId?: string, configuration?: Partial<Card['data']>) {
     if(!functionEnabled(toolId)){setToast('此功能已由管理员关闭');return}
     if (['generate','redraw'].includes(toolId)) {
@@ -846,12 +866,13 @@ function Workspace() {
     const width = source.measured?.width || Number(source.style?.width) || 340, height = source.measured?.height || Number(source.style?.height) || 340
     const frame = parameters.frame
     const outputWidth = frame ? width * frame.width : width, outputHeight = frame ? height * frame.height : height
+    const generation={...normalizeGeneration(draftGeneration),...(operation==='edit'&&parameters.boxes?{model:'doubao-seedream-5-0-pro-260628'}:{}),count:1}
     {
       const id = uid()
-      setNodes(current => [...current.map(n => ({ ...n, selected: false })), { id, type: 'card', position: { x: sourcePosition.x + width + 55, y: sourcePosition.y }, style: { width:outputWidth, height:outputHeight }, selected: true, data: { kind: 'image', src: source.data.src, canvasOperation:operation, canvasParameters:parameters, prompt:parameters.prompt||'', generation:{...normalizeGeneration(draftGeneration),count:1}, imagePresentationVersion: 1, label: builtinSkills[operation].name, imageJob: { status: 'submitting', message: '连接生图后台…' }, skillResult: { jobId: '', sourceNode: sourceId, baseId: sourceId, review: {} } } }])
+      setNodes(current => [...current.map(n => ({ ...n, selected: false })), { id, type: 'card', position: { x: sourcePosition.x + width + 55, y: sourcePosition.y }, style: { width:outputWidth, height:outputHeight }, selected: true, data: { kind: 'image', src: source.data.src, canvasOperation:operation, canvasParameters:parameters, prompt:parameters.prompt||'', generation, imagePresentationVersion: 1, label: builtinSkills[operation].name, imageJob: { status: 'submitting', message: '连接生图后台…' }, skillResult: { jobId: '', sourceNode: sourceId, baseId: sourceId, review: {} } } }])
       setEdges(current=>[...current,{id:`result-${id}`,source:sourceId,target:id}])
       setEditing(null); setMenu(null)
-      void sendGeneration(id, 'redraw', parameters.prompt || '', {...normalizeGeneration(draftGeneration),count:1}, [source.data.src],undefined,undefined,{...parameters,operation})
+      void sendGeneration(id, 'redraw', parameters.prompt || '', generation, [source.data.src],undefined,undefined,{...parameters,operation})
       return
     }
   }
@@ -864,7 +885,7 @@ function Workspace() {
       const response = await fetch(expansion?(expansion.operation==='expand'?'/api/skills/expand/tasks':'/api/skills/canvas/tasks'):'/api/skills/images/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(expansion?{requestId,operation:expansion.operation,parameters:expansion,base:images[0],frame:expansion.frame,prompt:expansion.prompt||'',options:{...generation,count:1}}:{ requestId, mode, prompt, options: generation, images }) })
       const job = await response.json()
       if (!response.ok) throw Error(job.error || '后台提交失败')
-      update(id, { imageJob: { id: job.id, requestId, createdAt: job.createdAt, finishedAt: job.finishedAt, serverNow: job.serverNow, status: job.status, message: job.message } })
+      update(id, { imageJob: { id: job.id, requestId, createdAt: job.createdAt, finishedAt: job.finishedAt, serverNow: job.serverNow, provider:job.provider, canQueryOriginal:job.canQueryOriginal, status: job.status, message: job.message } })
     } catch (cause) { update(id, { imageJob: { requestId, status: 'submit_error', message: cause instanceof Error ? cause.message : '连接失败，再次点击仅恢复同一请求' } }); setToast('提交未完成，请查看节点提示；重试使用同一请求 ID') }
     finally { sending.current.delete(id);setSubmittingIds(new Set(sending.current)) }
   }
@@ -979,7 +1000,8 @@ function Workspace() {
     quick:(operation:string,id:string)=>actionRef.current.quickAction(operation,id),
     editing,cancelEdit:()=>setEditing(null),
     confirmEdit:(parameters:InlineParameters)=>{const h=actionRef.current;if(h.editing)h.createQuickTask(h.editing.operation,h.editing.id,parameters)},
-    select:(id:string)=>setNodes(ns=>ns.map(n=>n.id===id?{...n,selected:!n.selected}:n))
+    select:(id:string)=>setNodes(ns=>ns.map(n=>n.id===id?{...n,selected:!n.selected}:n)),
+    selectLayer:(id:string)=>setNodes(ns=>ns.map(n=>({...n,selected:n.id===id})))
   }),[editing,setNodes])
   return <Actions.Provider value={actions}>{projectsOpen&&<ProjectManager onRename={setName} onClose={()=>setProjectsOpen(false)} onCreate={newCanvas} onDelete={deleteManagedProject} onOpen={openManagedProject} onImport={()=>open.current?.click()} onBackup={()=>void exportCanvasBackup()}/>}<div className={assetSession?.mode==='browse'?'app-shell asset-browser-open':'app-shell'}>
     <div hidden aria-hidden="true">{[...new globalThis.Map(nodes.filter(n=>n.data.extraction&&!['complete','paused'].includes(n.data.extraction.status)).map(n=>[n.data.extraction!.id,n.data.extraction!])).values()].map(task=><ExtractionMonitor key={task.id} id={task.id} kind={task.kind} onState={state=>extractionState(state)}/>)}</div>

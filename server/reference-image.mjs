@@ -13,7 +13,7 @@ export function referenceLimits(caps, request) {
   return {max_pixels:positive(limits?.max_pixels)||16_000_000,max_edge:positive(limits?.max_edge)||4096,max_bytes:Math.min(positive(limits?.max_bytes)||8_000_000,8_000_000)}
 }
 
-export function prepareReference(image, limits) {
+export function prepareReference(image, limits, options = {}) {
   return new Promise((resolve,reject)=>{
     const python=process.env.CANVAS_PYTHON || path.join(homedir(),'.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe')
     const child=spawn(python,[fileURLToPath(new URL('./reference_image.py',import.meta.url))],{windowsHide:true,timeout:60000})
@@ -21,6 +21,6 @@ export function prepareReference(image, limits) {
     child.stdout.on('data',bytes=>{out+=bytes});child.stderr.resume()
     child.on('error',()=>reject(Error('参考图缩放运行时不可用，请检查 Python 和 Pillow')))
     child.on('close',code=>{try{if(code!==0)throw Error();resolve(JSON.parse(out))}catch{reject(Error('参考图缩放失败，请检查图片格式和尺寸；尚未提交生图'))}})
-    child.stdin.on('error',()=>{});child.stdin.end(JSON.stringify({image,limits}))
+    child.stdin.on('error',()=>{});child.stdin.end(JSON.stringify({image,limits,...options}))
   })
 }

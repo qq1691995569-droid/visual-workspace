@@ -1,10 +1,10 @@
 import type { Node } from '@xyflow/react'
 
-/** Fit idle groups to their content while preserving every child's world position. */
+/** Fit idle free-form groups to their content while preserving every child's world position. */
 export function fitGroupNodes<N extends Node>(nodes: N[]): N[] {
   let next = nodes
   for (const original of nodes) {
-    if (original.data.kind !== 'group') continue
+    if (original.data.kind !== 'group' || original.data.layerStack) continue
     // A settled collection has fixed dimensions. Its contents need no layout scan.
     if (original.data.collapsed && original.width === 280 && original.height === 330 && original.style?.width === 280 && original.style?.height === 330) continue
     const group = next.find(n => n.id === original.id)!
