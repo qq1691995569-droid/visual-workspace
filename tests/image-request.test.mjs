@@ -30,3 +30,15 @@ test('不支持的模型、比例及数量在上传或提交前拒绝', () => {
  assert.throws(()=>imageRequest({...body,options:{...body.options,count:1}},mj))
  assert.equal(imageRequest({...body,options:{...body.options,count:4}},mj).params.count,4)
  })
+test('原生图层拆分只提交一张原图，不走候选张数与白底重绘',()=>{
+ const nativeRoute={...route,provider:'seedream',model:'doubao-seedream-5-0-pro-260628'}
+ const nativeCaps={routes:{'conversation-image':{model:nativeRoute.model,available_routes:[nativeRoute]}}}
+ const input={prompt:'按对象拆分',mode:'redraw',images:['original'],options:{model:nativeRoute.model,ratio:'auto',resolution:'2K',count:1},layerDecomposition:true}
+ const request=imageRequest(input,nativeCaps)
+ assert.equal(request.params.layer_decomposition,true)
+ assert.equal(request.params.size,'auto')
+ assert.equal(request.params.output_format,'png')
+ assert.equal(request.params.count,1)
+ assert.throws(()=>imageRequest({...input,images:['one','two']},nativeCaps),/一张原图/)
+ assert.throws(()=>imageRequest({...input,options:{...input.options,count:4}},nativeCaps),/一张原图/)
+})

@@ -5,6 +5,7 @@ import {adminManagement} from '../server/config-admin.mjs'
 test('submission stages distinguish uncertainty and post-generation failure',()=>{
  assert.match(taskSummary({failure:{stage:'before_submit'},status:'paused'}).stage,/提交前/)
  assert.match(taskSummary({status:'submission_unknown'}).stage,/不确定/)
+ assert.match(taskSummary({status:'submit_error',submissionAttemptedAt:'2026-10-24T10:00:00Z',failure:{stage:'rejected'}}).stage,/提交被 DREO 拒绝/)
  assert.match(taskSummary({status:'paused'}).stage,/记录不足/)
  assert.match(taskSummary({taskId:'remote',remoteStatus:'failed'}).stage,/DREO 已停止/)
  assert.match(taskSummary({taskId:'remote',resultFailure:{stage:'download'}}).stage,/结果下载失败/)

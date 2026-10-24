@@ -5,6 +5,7 @@ export function taskSummary(j){
  if(j.provider==='liblib'){const summary=taskSummary({...j,provider:undefined,taskId:j.generateUuid,remoteStatus:j.remoteStatus==='5'?'completed':['6','7'].includes(j.remoteStatus)?'failed':j.remoteStatus});return {...summary,provider:'liblib',stage:summary.stage.replaceAll('DREO','Liblib')}}
  let stage='记录不足，提交状态待核对'
  if(j.taskId){stage=j.resultFailure?'提交后 · '+(j.resultFailure.stage==='download'?'结果下载失败':'结果处理失败'):['failed','cancelled','rejected','error'].includes(j.remoteStatus)?'提交后 · DREO 已停止':j.status==='complete'?'已完成':'已提交 DREO · '+(j.status==='connection_lost'?'查询中断':'等待或处理中')}
+ else if(j.status==='submit_error'||j.failure?.stage==='rejected')stage='提交被 DREO 拒绝 · 无任务号'
  else if(j.status==='submission_unknown'||j.submissionAttemptedAt||j.status==='submitting')stage='提交状态不确定 · 请核对 DREO'
  else if(j.failure?.stage==='before_submit'||j.deferredEdit||['analyzing','locating','composing','uploading','queued'].includes(j.status))stage='提交前 · '+(j.status==='paused'?'处理失败':'准备中')
  if(j.canvasSkill&&['local-vision','rembg'].includes(j.canvasSkill.processor)&&!j.taskId)stage='本地处理 · 无 DREO 任务'

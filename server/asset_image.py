@@ -14,6 +14,29 @@ def encoded(image):
 body=json.load(sys.stdin)
 base=load(body['base']); w,h=base.size
 if w*h>40_000_000: raise ValueError('image too large')
+if body['action'] in ('native_separation_background','native_separation_layer'):
+    source=Image.open(io.BytesIO(base64.b64decode(body['result'].split(',',1)[1])))
+    source_format=source.format
+    source=ImageOps.exif_transpose(source)
+    if body['action']=='native_separation_background':
+        if abs(source.width/source.height-w/h)/(w/h)>.015: raise ValueError('Background aspect changed')
+        resized=source.size!=(w,h)
+        output=source.convert('RGB').resize((w,h),Image.Resampling.LANCZOS) if resized else source.convert('RGB')
+    else:
+        if source_format!='PNG' or 'A' not in source.getbands(): raise ValueError('Layer is not transparent PNG')
+        bounds=body.get('normalized')
+        if not isinstance(bounds,list) or len(bounds)!=4 or not all(isinstance(v,(int,float)) and 0<=v<=1000 for v in bounds) or bounds[2]<=bounds[0] or bounds[3]<=bounds[1]: raise ValueError('Invalid layer coordinates')
+        left=max(0,min(w-1,round(bounds[0]*w/1000)));top=max(0,min(h-1,round(bounds[1]*h/1000)))
+        right=max(left+1,min(w,round(bounds[2]*w/1000)));bottom=max(top+1,min(h,round(bounds[3]*h/1000)))
+        target=(right-left,bottom-top)
+        if abs(source.width/source.height-target[0]/target[1])/(target[0]/target[1])>.15: raise ValueError('Layer aspect does not match its coordinates')
+        layer=source.convert('RGBA')
+        if layer.getchannel('A').getextrema()[1]<16: raise ValueError('Layer has no visible alpha')
+        resized=layer.size!=target
+        if resized: layer=layer.resize(target,Image.Resampling.LANCZOS)
+        output=Image.new('RGBA',(w,h),(0,0,0,0));output.alpha_composite(layer,(left,top))
+        if output.getchannel('A').getpixel((min(w-1,right),min(h-1,bottom)))!=0 and right<w and bottom<h: raise ValueError('Layer escaped its coordinates')
+    json.dump({'image':encoded(output),'width':w,'height':h,'resized':resized},sys.stdout);sys.exit(0)
 if body['action']=='separation_output':
     result=ImageOps.exif_transpose(Image.open(io.BytesIO(base64.b64decode(body['result'].split(',',1)[1])))).convert('RGBA')
     if abs(result.width/result.height-w/h)/(w/h)>.015: raise ValueError('Layer aspect changed')

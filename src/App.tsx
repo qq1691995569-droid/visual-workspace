@@ -168,7 +168,7 @@ function CardNode({ id, data, selected, positionAbsoluteX, positionAbsoluteY, wi
     return <div style={{'--group-edge-scale':'var(--port-scale, 1)'} as React.CSSProperties} className={`workflow-group ${selected ? 'selected' : ''} ${data.collapsed ? 'collection-folded' : ''}`}>
       {!data.collapsed && <NodeResizer isVisible={singleSelected} minWidth={280} minHeight={180} />}
       <div className="group-heading">{data.collapsed ? <span className="collection-icon"><Layers size={18}/></span> : <GripHorizontal size={17} />}<input aria-label="工作流分组名称" className="nodrag nopan" value={data.label} maxLength={60} onChange={e => update(id, { label: e.target.value })} /><button className="nodrag nopan" title="收拢 / 展开 · Ctrl+G" aria-label={data.collapsed ? '展开卡片组' : '收拢卡片组'} onClick={e => { e.stopPropagation(); toggle(id) }}>{data.collapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}</button></div>
-      {data.collapsed ? <><div className="collection-cover">{cover ? <CanvasImage src={cover.data.previewSrc || cover.data.src || ''} alt="分组封面" width={340} height={240} /> : <Layers size={42} />}</div><div className="collection-footer"><div className="collection-summary"><span className="collection-count"><b>{children.length}</b> 个节点</span><span className={`collection-status ${failed ? 'failed' : running ? 'running' : ''}`}><i />{failed ? '需要检查' : running ? '处理中' : tasks.length ? '已完成' : '已收纳'}</span></div><button className="nodrag nopan" onClick={e => { e.stopPropagation(); toggle(id) }}>展开<ChevronRight size={14}/></button></div></> : <><div className="group-caption">{children.length} 个节点 · 拖动标题整体移动</div><button className="group-ungroup nodrag nopan" onClick={() => ungroup(id)}><Ungroup size={13} />取消收纳</button></>}
+      {data.collapsed ? <><div className="collection-cover">{data.previewSrc || cover ? <CanvasImage src={data.previewSrc || cover?.data.previewSrc || cover?.data.src || ''} alt="分组封面" width={340} height={240} /> : <Layers size={42} />}</div><div className="collection-footer"><div className="collection-summary"><span className="collection-count"><b>{children.length}</b> 个节点</span><span className={`collection-status ${failed ? 'failed' : running ? 'running' : ''}`}><i />{failed ? '需要检查' : running ? '处理中' : tasks.length ? '已完成' : '已收纳'}</span></div><button className="nodrag nopan" onClick={e => { e.stopPropagation(); toggle(id) }}>展开<ChevronRight size={14}/></button></div></> : <><div className="group-caption">{children.length} 个节点 · 拖动标题整体移动</div><button className="group-ungroup nodrag nopan" onClick={() => ungroup(id)}><Ungroup size={13} />取消收纳</button></>}
     </div>
   }
   if(data.extraction&&!data.src)return <>{imageTag}<GenerationPlaceholder task={{...data.extraction,status:data.extraction.itemStatus||data.extraction.status,message:data.extraction.itemMessage||data.extraction.message}} index={data.extraction.index}><Handle type="target" position={Position.Left}/></GenerationPlaceholder></>
@@ -544,19 +544,28 @@ function Workspace() {
     const original = source.data.comparison?.original || nodes.find(n => n.id === baseId)?.data.comparison?.original || nodes.find(n => n.id === baseId)?.data.src || input
     const comparison = source.data.textureState?.base ? {original:source.data.textureState.base} : source.data.tool === 'platform-upscale' && input ? { original: input } : source.data.toneSettings?.base ? {original:source.data.toneSettings.base} : original ? { original, input } : undefined
     const results: Card[] = []
+    const decoded: HTMLImageElement[] = []
     for (const result of images) {
       const img = new Image(); img.src = result.src
       try { await img.decode() } catch { continue }
+      decoded.push(img)
       results.push({ id: `skill-${job}-${result.index}`, type: 'card', position: { x: 0, y: 0 }, style: { width: 340, height: 340 * img.naturalHeight / img.naturalWidth }, data: { kind: 'image', generatedSkill: source.data.canvasOperation ? builtinSkills[source.data.canvasOperation].name : source.data.localEdit ? source.data.localEdit.kind==='material'?'材质优化':'模型替换' : tools.find(t=>t.id===source.data.tool)?.name || '图片生成', src: result.src, toneSettings: result.toneSettings, label: `${source.data.canvasOperation ? builtinSkills[source.data.canvasOperation].name : source.data.localEdit ? source.data.localEdit.kind === 'material' ? '材质优化' : '模型替换' : source.data.tool === 'texture-restore' ? '图片重绘' : source.data.tool === 'tone-skill' ? '场景调色' : source.data.tool === 'style' ? '风格转换' : source.data.tool === 'light' ? '光影优化' : '生图结果'} ${result.index + 1}`, dimensions: `${img.naturalWidth} × ${img.naturalHeight}`, version:{parentId:versionParent?.id,parentLabel:versionParent?.data.label,revision:(versionParent?.data.version?.revision || 0)+1}, imagePresentationVersion: 1, provenanceLinked: true, comparison: result.toneSettings?.base ? {original:result.toneSettings.base} : comparison, localEdit: source.data.localEdit, iterationContext: { modification: source.data.submittedRefinement?.jobId===job ? source.data.submittedRefinement.prompt : undefined, lighting: source.data.skillState?.lighting, tool: source.data.tool || 'redraw', prompt: source.data.localEdit?.supplement || source.data.skillState?.supplement || source.data.prompt || '', referenceIds: source.data.skillState?.referenceIds || (source.data.composerRequest ? source.data.composerRequest.referenceIds || (source.data.composerRequest.input ? [source.data.composerRequest.input.id] : []) : edges.filter(e => e.target === id && e.targetHandle === 'style').map(e => e.source)), options: source.data.skillState?.options || (source.data.tool === 'style' ? { model: 'doubao-seedream-5-0-pro-260628', resolution: '2K', ratio: 'auto', count: 4 } : source.data.generation || defaultGeneration) }, skillResult: { jobId: job, sourceNode: id, baseId, review: result.review } } })
     }
     if(epoch !== graphEpoch.current)return
+    let layeredPreview: string | undefined
+    if(source.data.canvasOperation==='separate' && decoded.length===images.length && decoded.length>1 && decoded.every(img=>img.naturalWidth===decoded[0].naturalWidth&&img.naturalHeight===decoded[0].naturalHeight)){
+      const canvas=document.createElement('canvas'),scale=Math.min(1,720/Math.max(decoded[0].naturalWidth,decoded[0].naturalHeight))
+      canvas.width=Math.max(1,Math.round(decoded[0].naturalWidth*scale));canvas.height=Math.max(1,Math.round(decoded[0].naturalHeight*scale))
+      const context=canvas.getContext('2d')
+      if(context){for(const image of decoded)context.drawImage(image,0,0,canvas.width,canvas.height);layeredPreview=canvas.toDataURL('image/png')}
+    }
     if(images.some(result=>result.review?.layer) && results.length){
       if(source.data.kind==='group')return
       setNodes(current=>{
         if(!current.some(n=>n.id===id))return current
         const width=results.length*360+20,height=Math.max(...results.map(r=>Number(r.style?.height)||340))+80
         const children=results.map((r,index)=>({...r,parentId:id,extent:'parent' as const,position:{x:20+index*360,y:50},data:{...r.data,label:images[index].review.layer}}))
-        return [...current.map(n=>n.id===id?{...n,style:{width,height},deletable:false,dragHandle:'.group-heading',data:{kind:'group' as const,label:'多图层 · 背景与透明前景',collectionManaged:true,expandedSize:{width,height}}}:n).filter(n=>!children.some(c=>c.id===n.id)),...children]
+        return [...current.map(n=>n.id===id?{...n,style:{width,height},deletable:false,dragHandle:'.group-heading',data:{kind:'group' as const,label:'多图层 · 原图坐标透明图层',previewSrc:layeredPreview,collectionManaged:true,expandedSize:{width,height}}}:n).filter(n=>!children.some(c=>c.id===n.id)),...children]
       })
       return
     }

@@ -5,9 +5,13 @@ const processors={'white-background':'white',edit:'image',redraw:'image',backgro
 export async function canvasSkill(operation, root=new URL('./skills/',import.meta.url)) {
   if(!Object.hasOwn(processors,operation))throw Error('未知画布技能')
   if(operation==='separate'){
-    const source=configuredText('separate',await readFile(new URL('interior-scene-separate/SKILL.md',root),'utf8'))
+    const source=await readFile(new URL('interior-scene-separate/SKILL.md',root),'utf8')
+    const persona=await readFile(new URL('interior-scene-separate/PERSONA.md',root),'utf8')
     const contract=await readFile(new URL('interior-scene-separate/references/plan-contract.md',root),'utf8')
-    return {operation,name:'室内场景分层',version:2,processor:'interior-separate',model:'doubao-seedream-5-0-pro-260628',prompt:personaText(operation)+'\n'+source+'\n'+contract,hash:createHash('sha256').update(source+contract).digest('hex')}
+    const configuredRules=configuredText('separate','')
+    const supplement=[personaText(operation),configuredRules!==source?configuredRules:''].filter(Boolean).join('\n')
+    const prompt=[supplement&&'后台补充偏好（仅在与固定约束兼容时适用）：\n'+supplement,'固定执行人设：\n'+persona,'拆分规则：\n'+source,'字段协议：\n'+contract].filter(Boolean).join('\n')
+    return {operation,name:'室内场景分层',version:3,processor:'interior-separate',model:'doubao-seedream-5-0-pro-260628',prompt,hash:createHash('sha256').update(prompt).digest('hex')}
   }
   const source=configuredText(operation,await readFile(new URL(`canvas-${operation}/SKILL.md`,root),'utf8'))
   const match=source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]+)$/)

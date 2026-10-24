@@ -7,7 +7,7 @@ export function ImageJob({ job, onChange, onResults, endpoint = 'images', monito
   useEffect(() => { latest.current = { job, onChange, onResults } })
   useEffect(() => {
     const id = job.id || job.requestId
-    if (submitting || !monitor || !id || job.monitoringStopped || ['connection_lost','needs_attention','submission_unknown'].includes(job.status)) return
+    if (submitting || !monitor || !id || job.monitoringStopped || ['connection_lost','needs_attention','submit_error'].includes(job.status)) return
     let stopped = false, failures = 0, timer: ReturnType<typeof setTimeout>
     const controller = new AbortController()
     async function poll() {
@@ -25,7 +25,7 @@ export function ImageJob({ job, onChange, onResults, endpoint = 'images', monito
         if (result.images?.length) await latest.current.onResults(result.id, result.images)
         if (stopped) return
         latest.current.onChange({ ...latest.current.job, aliasJobIds:result.aliasJobIds, taskId:result.taskId, phase:result.phase, createdAt: result.createdAt, finishedAt: result.finishedAt, serverNow: result.serverNow, id: result.id, status: result.status, message: [result.message, result.warning].filter(Boolean).join('；') })
-        if (['complete','paused','submission_unknown','connection_lost','needs_attention'].includes(result.status)) return
+        if (['complete','paused','submission_unknown','submit_error','connection_lost','needs_attention'].includes(result.status)) return
       } catch {
         if (stopped) return
         failures++
@@ -40,7 +40,7 @@ export function ImageJob({ job, onChange, onResults, endpoint = 'images', monito
 }
 export function ImageJobControls({job,onChange}:{job:ImageJobState;onChange:(job:ImageJobState)=>void}){
  const unresolved=['connection_lost','needs_attention','submission_unknown','paused'].includes(job.status)
- if(job.status==='complete')return null
+ if(job.status==='complete'||job.status==='submit_error')return null
  return <div className="task-recovery-actions nodrag nopan" onPointerDown={e=>e.stopPropagation()}>
  {(unresolved||job.monitoringStopped)&&<button title="只查询原任务，不重复生成" onClick={()=>onChange({...job,status:'restoring',monitoringStopped:false,queryAttempt:(job.queryAttempt||0)+1,message:'正在重新查询原任务…'})}>查询原任务</button>}
  {!job.monitoringStopped&&<button title="只停止本地等待，不取消远端任务" onClick={()=>onChange({...job,status:'paused',monitoringStopped:true,message:'已停止本地等待，远端任务可能继续；可查询原任务找回结果。'})}>停止等待</button>}

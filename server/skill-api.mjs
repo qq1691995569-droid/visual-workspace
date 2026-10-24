@@ -97,7 +97,7 @@ async function dreo(method, endpoint, body) {
   const c = await config(); const url = new URL(c.origin)
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw Error('DREO origin 无效')
   const res = await fetch(`${c.origin.replace(/\/$/, '')}/api/agent${endpoint}`, { method, headers: { Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(45000), redirect: 'error' })
-  if (!res.ok) throw Error(`DREO 请求失败（HTTP ${res.status}）`)
+  if (!res.ok) throw Object.assign(Error(`DREO 请求失败（HTTP ${res.status}）`),{status:res.status})
   return res.json()
 }
 async function preprocess(image) {
@@ -167,7 +167,7 @@ async function whiteBackgroundResult(job, source) {
   await save(job)
   return null
 }
-const syncSeparation=separationRunner({active,save,load,vision,imageRequest,submitImage,syncJob,cutout:localCutout,imageTool:assetImageTool,capabilities:()=>dreo('GET','/capabilities'),deleted:id=>deletedJobs.has(id)})
+const syncSeparation=separationRunner({active,save,load,vision,imageRequest,submitImage,syncJob,submitNative:submitNativeSeparation,fetchNativeTask:id=>dreo('GET',`/tasks/${encodeURIComponent(id)}`),downloadImage,cutout:localCutout,imageTool:assetImageTool,capabilities:()=>dreo('GET','/capabilities'),deleted:id=>deletedJobs.has(id)})
 async function syncJob(job) {
   if(job.deletedAt||deletedJobs.has(job.id))return {...job,status:"paused",message:"任务已删除",images:[]}
   if(job.provider==='liblib')return localLiblib.sync(job)
@@ -282,6 +282,32 @@ async function submitImage(job, body, request) {
     job.status = 'running';if(job.phase)job.phase={step:4,total:4}; job.message = job.phase?`步骤 4/4 · 模型正在生成，已保存 0/${job.options.count} 张`:'DREO 正在生成'; await save(job); monitor(job.id)
   } catch (cause) { await submissionFailure(job, cause, attempted) }
   finally { active.delete(job.id) }
+}
+async function submitNativeSeparation(job,body,request){
+  let attempted=false
+  try{
+    job.status='uploading';job.message='正在上传待拆分原图';await save(job)
+    const limits=referenceLimits(await dreo('GET','/capabilities'),request)
+    const {image,...metadata}=await prepareReference(body.images[0],limits)
+    job.referencePreparation=[metadata]
+    const uploaded=await dreo('POST','/upload',{image})
+    if(!uploaded.storage_key)throw Error('原图上传失败，尚未提交生图')
+    request.params.image_paths=[uploaded.storage_key]
+    job.status='submitting';job.message='正在提交一次原生图层拆分';job.submissionAttemptedAt=new Date().toISOString();await save(job)
+    attempted=true
+    if(deletedJobs.has(job.id))return
+    const task=await dreo('POST','/tasks',request)
+    job.taskId=task.task_id||task.id
+    if(!job.taskId)throw Error('DREO 未返回任务 ID')
+    job.status='running';job.message='DREO 已接收原生图层拆分任务';await save(job);monitor(job.id)
+  }catch(error){
+    if(attempted&&!job.taskId&&[400,404,415,422].includes(error.status)){
+      job.failure={stage:'rejected',httpStatus:error.status,message:safeTaskMessage(error.message),at:new Date().toISOString(),previousStatus:job.status}
+      job.status='submit_error'
+      job.message=`DREO 拒绝了原生图层拆分请求（HTTP ${error.status}），未返回任务号。请核对 DREO 任务接口是否支持图层拆分参数；不会自动重提。`
+      await save(job)
+    }else await submissionFailure(job,error,attempted)
+  }
 }
 async function executeSkill(job, body, routes) {
   active.add(job.id)
@@ -480,14 +506,12 @@ async function handle(method, url, body) {
     if(prior){if(prior.fingerprint!==fingerprint)throw Error('请求 ID 已用于另一组操作');return publicJob(prior)}
     if(skill.processor==='interior-separate'){
       if(!visionConfigured())throw Error('请先配置视觉分析接口，再使用室内场景分层')
-      await localCutout(null) // Verify the alpha runtime before any paid generation.
       const caps=await dreo('GET','/capabilities'),meta=await assetImageTool({action:'inspect',base:body.base})
       const route=caps.routes?.['conversation-image']?.available_routes?.find(r=>r.model===skill.model)
       if(!route)throw Error('后台尚未开放 Seedream 5.0 Pro 分层模型')
-      const ratio=ratioFor(meta.width,meta.height)
-      const options={model:skill.model,ratio,resolution:route.supported_resolutions?.includes('2K')?'2K':route.supported_resolutions?.[0],count:1}
-      imageRequest({mode:'redraw',images:[body.base],prompt:'分层预检',options},caps)
-      const job={id:body.requestId,type:'generation',feature:'image',canvasSkill:skill,fingerprint,options,status:'analyzing',message:'正在准备室内场景分层',images:[],createdAt:new Date().toISOString(),separation:{base:body.base,supplement:parameters.prompt||'',source:meta}}
+      const options={model:skill.model,ratio:'auto',resolution:route.supported_resolutions?.includes('2K')?'2K':route.supported_resolutions?.[0],count:1}
+      imageRequest({mode:'redraw',images:[body.base],prompt:'分层预检',options,layerDecomposition:true},caps)
+      const job={id:body.requestId,type:'generation',feature:'image',canvasSkill:skill,fingerprint,options,status:'analyzing',message:'正在准备一次原生图层拆分',images:[],createdAt:new Date().toISOString(),separation:{native:true,base:body.base,supplement:parameters.prompt||'',source:meta}}
       await mkdir(store,{recursive:true})
       try{await writeFile(idPath(job.id),JSON.stringify({...job,functionConfig:job.functionConfig||configSnapshot()}),{flag:'wx'})}catch(error){if(error.code!=='EEXIST')throw error;return publicJob(await load(job.id))}
       void syncSeparation(job).then(()=>monitor(job.id));return publicJob(job)
