@@ -9,6 +9,10 @@ test('generator frame follows connected reference geometry',async({page})=>{
  const frame=page.locator('.react-flow__node[data-id="b"]')
  await expect(frame).toHaveCSS('width',`${width}px`)
  await expect(frame).toHaveCSS('height',`${height}px`)
+ await expect(frame.locator('.generator-identity strong,.generator-identity small')).toHaveCount(0)
+ const frameBox=await frame.boundingBox(),iconBox=await frame.locator('.generator-icon').boundingBox()
+ expect(Math.abs((iconBox!.x+iconBox!.width/2)-(frameBox!.x+frameBox!.width/2))).toBeLessThan(1)
+ expect(Math.abs((iconBox!.y+iconBox!.height/2)-(frameBox!.y+frameBox!.height/2))).toBeLessThan(1)
  await page.screenshot({path:`artifacts/generator-frame-${width}.png`})
  }
 })

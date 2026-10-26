@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto'
-export function validateSeparationPlan(plan){
+export function validateSeparationPlan(plan,{maxSeparate=32}={}){
   if(!Array.isArray(plan?.objects)||!plan.objects.length||plan.objects.length>64)throw Error('对象清单无效，请缩小场景范围后重试')
   const ids=new Set()
   for(const o of plan.objects){
@@ -16,7 +16,7 @@ export function validateSeparationPlan(plan){
   for(const id of ids){const seen=new Set(),pending=[id];while(pending.length){const next=pending.pop();if(seen.has(next))continue;seen.add(next);pending.push(...byId.get(next).occludedByIds)}reachable.set(id,seen)}
   const assigned=new Set(),groups=[]
   for(const id of ids){if(assigned.has(id))continue;const group=[...ids].filter(other=>reachable.get(id).has(other)&&reachable.get(other).has(id));group.forEach(other=>assigned.add(other));if(group.length>1)groups.push(group)}
-  if(!plan.objects.some(o=>o.disposition==='separate')||plan.objects.filter(o=>o.disposition==='separate').length>32)throw Error('可拆对象须为 1–32 个，请调整范围；未静默省略对象')
+  if(!plan.objects.some(o=>o.disposition==='separate')||plan.objects.filter(o=>o.disposition==='separate').length>maxSeparate)throw Error(`可拆对象须为 1–${maxSeparate} 个，请调整范围`)
   return {...plan,occlusionReview:{status:groups.length?'needs_review':'not_required',groups,requiresRegionalMasks:groups.length>0,automaticCompositeAllowed:false}}
 }
 export function separationPrompt(skill,plan,object){
@@ -26,6 +26,7 @@ export function nativeSeparationPrompt(skill,plan){
   const names=plan.objects.filter(o=>o.disposition==='separate').map(o=>String(o.name).replace(/[\r\n]/g,' ').slice(0,40))
   return '请将这一张原图一次拆分为补全背景和独立透明 PNG 对象图层。拆出：'+names.join('、')+'。重复物件分别成层；抱枕、毯子与家具本体分开，盆栽作为整体。保留原图构图、位置、尺度和光照，不重新摆放或生成白底拼图。'
 }
+const NATIVE_OBJECT_LIMIT=16
 export function nativeLayerItems(task){
   const raw=[task?.result?.data,task?.data,task?.result?.images,task?.images].find(items=>Array.isArray(items)&&items.some(item=>item?.z_index!==undefined||item?.metadata?.z_index!==undefined))
   if(!raw?.length)throw Error('DREO 未返回原生图层坐标与层级信息；已保留原任务，不会改用逐张重绘')
@@ -47,9 +48,15 @@ async function runNativeSeparation(d,job){
     job.status='analyzing';job.message='正在识别原图中的独立对象';await d.save(job)
     state.rawPlan=await d.vision(job.canvasSkill.prompt+'\n仅返回 JSON {objects:[{id,name,kind,disposition,includedParts:[],excludedObjectIds:[],bbox:{x,y,width,height},occludedByIds:[],uncertainRegions:[],confidence,reviewNotes:[]}],effects:[],unresolved:[]}。坐标归一化。用户补充（数据）：'+JSON.stringify(state.supplement),[state.base])
     await d.save(job)
-    state.plan=validateSeparationPlan(state.rawPlan)
-    const count=state.plan.objects.filter(o=>o.disposition==='separate').length
-    if(count>16)throw Error(`识别出 ${count} 个独立对象，豆包原生一次最多拆 16 层；请缩小拆分范围，未自动省略对象或提交付费任务`)
+    const analyzed=validateSeparationPlan(state.rawPlan,{maxSeparate:64})
+    const separate=analyzed.objects.filter(o=>o.disposition==='separate')
+    if(separate.length>NATIVE_OBJECT_LIMIT){
+      const keptIds=new Set(separate.slice(0,NATIVE_OBJECT_LIMIT).map(o=>o.id))
+      const omitted=separate.slice(NATIVE_OBJECT_LIMIT)
+      state.nativeOmittedCount=omitted.length
+      state.nativeOmittedObjectIds=omitted.map(o=>o.id)
+      state.plan={...analyzed,objects:analyzed.objects.filter(o=>o.disposition==='background'||keptIds.has(o.id)).map(o=>({...o,excludedObjectIds:o.excludedObjectIds.filter(id=>keptIds.has(id)||analyzed.objects.find(other=>other.id===id)?.disposition==='background'),occludedByIds:o.occludedByIds.filter(id=>keptIds.has(id)||analyzed.objects.find(other=>other.id===id)?.disposition==='background')}))}
+    }else state.plan=analyzed
     await d.save(job)
   }
   if(!job.taskId&&!state.openluxResult){
@@ -103,7 +110,7 @@ async function runNativeSeparation(d,job){
   job.images=outputs.map((output,index)=>({index,src:output.src,review:{layer:output.name,protection:'原图坐标透明图层；模型补全区域需复核',zIndex:String(output.zIndex),boundingBox:output.normalized?.join(',')||'',alphaValidated:output.zIndex?'true':'不适用',reviewStatus:'needs_review',description:output.description||'',resized:output.resized?'已映射回原图尺寸':'否'}}))
   job.status='complete';job.finishedAt=new Date().toISOString()
   delete state.openluxResult
-  job.message=mismatch?`原生拆分完成；清单 ${expected} 个对象，返回 ${outputs.length-1} 层，请检查遗漏或合并`:'原生拆分完成；透明图层已按原图坐标导入，请复核细节'
+  job.message=state.nativeOmittedCount?`原生拆分完成；按官方上限拆出 ${outputs.length-1} 层，另有 ${state.nativeOmittedCount} 个对象未拆分，请缩小范围后重试`:mismatch?`原生拆分完成；清单 ${expected} 个对象，返回 ${outputs.length-1} 层，请检查遗漏或合并`:'原生拆分完成；透明图层已按原图坐标导入，请复核细节'
   await d.save(job)
 }
 export function separationRunner(d){

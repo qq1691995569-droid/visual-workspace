@@ -98,6 +98,12 @@ async function submissionFailure(job, error, attempted) {
   if (job.taskId) monitor(job.id)
 }
 const imageValid = image => typeof image === 'string' && image.length < 35 * 1024 * 1024 && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(image)
+const processingInputLimits = { max_pixels: 36_000_000, max_edge: 10_000, max_bytes: 30_000_000 }
+async function prepareProcessingBody(body) {
+  if (!body || typeof body.base !== 'string' || !imageValid(body.base)) return body
+  const { image, ...metadata } = await prepareReference(body.base, processingInputLimits)
+  return { ...body, base: image, basePreparation: metadata }
+}
 async function dreo(method, endpoint, body) {
   const c = await config(); const url = new URL(c.origin)
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw Error('DREO origin 无效')
@@ -269,7 +275,7 @@ async function submit(job, prepared) {
   try {
     job.status = 'uploading'; job.message = '上传灰度稿与结构线稿'; await save(job)
     const keys = []
-    const limits=referenceLimits(await dreo('GET','/capabilities'),{tool_type:'conversation-image',params:{route_override:{provider:job.options?.provider||'seedream',model:job.options?.model||MODEL}}})
+    const limits=referenceLimits(await dreo('GET','/capabilities'),{tool_type:'conversation-image',params:{route_override:{provider:job.options?.provider||'seedream',model:job.options?.model||MODEL},resolution:job.options?.resolution}})
     job.referencePreparation=[]
     for (const original of [prepared.gray, prepared.line]) { const {image,...metadata}=await prepareReference(original,limits);job.referencePreparation.push(metadata);const result = await dreo('POST', '/upload', { image }); if (!result.storage_key) throw Error('上传未返回 storage_key'); keys.push(result.storage_key) }
     const request = generationRequest(job.plan, keys, job.ratio, job.rules || rules, job.options)
@@ -439,6 +445,11 @@ async function handle(method, url, body) {
     liveJobs.delete(id)
     return {deleted:true,remoteMayContinue:!!job?.taskId||!!job&&active.has(id)}
   }
+
+  // Python vision and local image tools have a 40 MP decode ceiling. Normalize
+  // the working copy before any route inspects the base image, while leaving
+  // the original canvas source untouched in the browser.
+  if(method==='POST' && body?.base) body=await prepareProcessingBody(body)
 
   if(method==='POST' && url==='/api/skills/assets/extract/tasks') {
     idPath(body.requestId)

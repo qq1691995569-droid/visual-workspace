@@ -76,13 +76,13 @@ test('native decomposition submits once, maps transparent layers, and keeps the 
  assert.match(nativeSeparationPrompt(job.canvasSkill,plan()),/一张原图/)
  assert.ok(nativeSeparationPrompt(job.canvasSkill,plan()).length<300)
 })
-test('native result requires coordinates; over 16 objects stops before paid submission',async()=>{
+test('native result requires coordinates; over 16 objects submits only the official cap',async()=>{
  assert.throws(()=>nativeLayerItems({result:{data:[{z_index:0,url:'https://test/bg.png'},{z_index:1,url:'https://test/layer.png'}]}}),/坐标/)
  const p=plan();p.objects=Array.from({length:17},(_,i)=>({...p.objects[0],id:'object-'+i,name:'对象 '+i}))
  let submitted=0
  const job={id:'native-limit',status:'analyzing',canvasSkill:{prompt:'rules'},options:{count:1},separation:{native:true,base:'original'},images:[]}
- await separationRunner({active:new Set(),save:async()=>{},vision:async()=>p,submitNative:async()=>{submitted++}})(job)
- assert.equal(job.status,'paused');assert.match(job.message,/最多拆 16 层/);assert.equal(submitted,0)
+ await separationRunner({active:new Set(),save:async()=>{},vision:async()=>p,capabilities:async()=>({}),imageRequest:()=>({}),submitNative:async()=>{submitted++}})(job)
+ assert.equal(job.status,'analyzing');assert.equal(job.separation.plan.objects.filter(o=>o.disposition==='separate').length,16);assert.equal(job.separation.nativeOmittedCount,1);assert.equal(submitted,1)
 })
 test('transient native task query retries the same task without a second submission',async()=>{
  let queries=0,submissions=0

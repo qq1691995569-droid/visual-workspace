@@ -30,3 +30,21 @@ export function targetDimensions(settings: Generation) {
   const [w, h] = settings.ratio.split(':').map(Number)
   return { width: Math.round(longEdge * w / Math.max(w, h) / 8) * 8, height: Math.round(longEdge * h / Math.max(w, h) / 8) * 8 }
 }
+
+export function nearestRatio(width: number, height: number, supported: readonly string[] = ratios): Generation['ratio'] {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return '1:1'
+  const aspect = width / height
+  let selected = '1:1', distance = Number.POSITIVE_INFINITY
+  for (const candidate of supported) {
+    const [w, h] = candidate.split(':').map(Number)
+    if (!w || !h) continue
+    const next = Math.abs(Math.log(aspect / (w / h)))
+    if (next < distance) { selected = candidate; distance = next }
+  }
+  return selected as Generation['ratio']
+}
+
+export function ratioFromDimensions(dimensions?: string, supported: readonly string[] = ratios): Generation['ratio'] {
+  const match = dimensions?.match(/(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)/i)
+  return match ? nearestRatio(Number(match[1]), Number(match[2]), supported) : '1:1'
+}

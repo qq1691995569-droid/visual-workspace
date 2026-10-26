@@ -71,6 +71,22 @@ test('JPG长边限制与小图保持原尺寸', async ({page}) => {
   expect(result).toEqual([{width:2048,height:4096,hasPreview:true},{width:1200,height:800,hasPreview:false}])
 })
 
+test('加入图像生成对话框时自动沿用原图比例', async ({page}) => {
+  await page.goto('/')
+  const original = await page.evaluate(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 1200; canvas.height = 900
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#937'; ctx.fillRect(0, 0, canvas.width, canvas.height)
+    return canvas.toDataURL('image/png')
+  })
+  await page.locator('input[type=file]').first().setInputFiles({
+    name: 'landscape.png', mimeType: 'image/png', buffer: Buffer.from(original.split(',')[1], 'base64'),
+  })
+  await page.locator('.image-body img').first().click({ modifiers: ['Control'] })
+  await expect(page.getByRole('button', { name: '画面比例：4:3' })).toBeVisible()
+})
+
 test('选中过技能节点后导入图片不自动连接，已有连线保持不变', async ({page}) => {
   await page.goto('/')
   const src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='

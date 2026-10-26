@@ -7,10 +7,17 @@ export function referenceLimits(caps, request) {
   const catalog=caps.routes?.[request.tool_type]
   const selected=request.params?.route_override
   const route=catalog?.available_routes?.find(r=>r.model===selected?.model&&r.provider===selected?.provider) || (!selected ? catalog : undefined)
-  // Generic limits describe model output on some backends: use them only as a conservative upload policy.
-  const limits=route?.input_limits || route?.limits
+  // Prefer explicit input limits. When a provider only advertises output
+  // resolutions, use the selected resolution as the conservative input cap.
+  const limits=route?.input_limits || route?.limits || {}
   const positive=value=>Number.isFinite(value)&&value>0?Math.floor(value):undefined
-  return {max_pixels:positive(limits?.max_pixels)||16_000_000,max_edge:positive(limits?.max_edge)||4096,max_bytes:Math.min(positive(limits?.max_bytes)||8_000_000,8_000_000)}
+  const firstPositive=(...values)=>values.map(positive).find(value=>value!==undefined)
+  const resolution=request.params?.resolution
+  const resolutionEdge={ '1K':1024, '2K':2048, '4K':4096 }[resolution] || 4096
+  const maxEdge=firstPositive(limits.max_edge,limits.max_input_edge,limits.max_reference_edge,route?.max_input_edge,route?.max_reference_edge) || resolutionEdge
+  const maxPixels=firstPositive(limits.max_pixels,limits.max_input_pixels,limits.max_reference_pixels,route?.max_input_pixels,route?.max_reference_pixels) || maxEdge*maxEdge
+  const maxBytes=Math.min(firstPositive(limits.max_bytes,limits.max_input_bytes,limits.max_reference_bytes,route?.max_input_bytes,route?.max_reference_bytes) || 8_000_000,8_000_000)
+  return {max_pixels:maxPixels,max_edge:maxEdge,max_bytes:maxBytes}
 }
 
 export function prepareReference(image, limits, options = {}) {

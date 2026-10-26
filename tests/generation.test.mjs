@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { normalizeGeneration, defaultGeneration, targetDimensions, ratios, resolutions } from '../src/generation.ts'
+import { normalizeGeneration, defaultGeneration, targetDimensions, nearestRatio, ratioFromDimensions, ratios, resolutions } from '../src/generation.ts'
 
 test('旧项目及损坏参数能回退到默认配置', () => {
   assert.deepEqual(normalizeGeneration(), defaultGeneration)
@@ -21,4 +21,10 @@ test('目标尺寸方向正确且长边与分辨率一致', () => {
 test('节点生成偏好能通过 JSON 往返保留', () => {
   const settings = { model: 'seedream-4.5', count: 4, resolution: '4K', ratio: '9:16', quality: '极致' }
   assert.deepEqual(normalizeGeneration(JSON.parse(JSON.stringify(settings))), settings)
+})
+test('参考图尺寸自动匹配最近的生成比例', () => {
+  assert.equal(ratioFromDimensions('1200 × 900 px'), '4:3')
+  assert.equal(ratioFromDimensions('11648 × 4957 px'), '21:9')
+  assert.equal(nearestRatio(1000, 700, ['1:1', '4:3']), '4:3')
+  assert.equal(ratioFromDimensions('无法识别尺寸'), '1:1')
 })

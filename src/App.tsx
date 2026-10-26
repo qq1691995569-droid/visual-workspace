@@ -33,7 +33,7 @@ import { ResultDock } from './ResultDock'
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, memo, createContext, useContext } from 'react'
 import { getViewportForBounds, ReactFlow, ReactFlowProvider, Controls, MiniMap, Position, SelectionMode, NodeResizer, useNodesState, useEdgesState, useReactFlow, useStore, useUpdateNodeInternals, addEdge, reconnectEdge, type Node, type NodeProps, type Edge, type Viewport } from '@xyflow/react'
 import { readCanvasProject, writeCanvasProject, canvasProjects, readCanvasBackup } from './canvasStorage'
-import { Undo2, Redo2, Archive, Upload, Download, Layers, WandSparkles, Plus, X, ImagePlus, Palette, Sun, Armchair, Maximize, Scan, FolderOpen, Columns2, Check, ChevronDown, ChevronUp, Group, Ungroup, GripHorizontal, MousePointer2, Map, Eye, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
+import { Undo2, Redo2, Archive, Upload, Download, Layers, WandSparkles, Plus, X, ImagePlus, Pencil, Palette, Sun, Armchair, Maximize, Scan, FolderOpen, Columns2, Check, ChevronDown, ChevronUp, Group, Ungroup, GripHorizontal, MousePointer2, Map, Eye, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import '@xyflow/react/dist/style.css'
 import './App.css'
 import './WorkspaceTheme.css'
@@ -50,7 +50,7 @@ import { ImageToolbar } from './ImageToolbar'
 import { GenerationControls } from './GenerationControls'
 import { absolutePosition, groupBounds, detachGroup, nextBatchPosition, fitGroupNodes } from './graphLayout'
 import { restackLayerGroups, type StackCrop } from './layerStack'
-import { defaultGeneration, normalizeGeneration, modelOptions, targetDimensions, type Generation } from './generation'
+import { defaultGeneration, normalizeGeneration, modelOptions, ratioFromDimensions, targetDimensions, type Generation } from './generation'
 
 const tools = [
   {id:'texture-restore',name:'图片重绘',detail:'线稿锁定构图 · 还原材质与光影',icon:WandSparkles},
@@ -163,9 +163,9 @@ function CardNode({ id, data, selected, positionAbsoluteX, positionAbsoluteY, wi
   }}/>:undefined
   const imageTask = data.extraction ? {status:data.extraction.itemStatus || data.extraction.status} : (data.pendingResult ? pendingJob || {status:'restoring'} : data.imageJob)
   const imageSkill = data.generatedSkill || (data.canvasOperation ? builtinSkills[data.canvasOperation]?.name : undefined) || (data.extraction || data.extractedAsset ? '资产提取' : data.localEdit ? data.localEdit.kind==='material'?'材质优化':'模型替换' : tools.find(t=>t.id===(data.iterationContext?.tool || data.tool))?.name)
-  const hasImageOrigin = imageSkill || data.skillResult || data.pendingResult || data.imageJob || data.task
   const imageStatus = data.task ? '待处理' : imageTask && !['complete','completed'].includes(imageTask.status || '') ? ['paused','needs_attention','submit_error','submission_unknown','connection_lost','failed'].includes(imageTask.status || '') ? '需处理' : imageTask.status==='restoring'?'查询中':'生成中' : '已完成'
-  const imageTag = data.kind==='image' && !data.stackLayer && singleSelected && !editing && hasImageOrigin ? <div className="image-origin-label" data-status={imageStatus} title={`${imageSkill || data.label} · ${imageStatus}${data.label?' · '+data.label:''}`}><ImagePlus size={13}/><span>{imageSkill || data.label || '图片生成'}</span><i/><small>{imageStatus}</small></div> : null
+  const previewStatusLabel = imageTask && !['complete','completed'].includes(imageTask.status || '') ? '图片编辑' : imageSkill || data.label || '图片生成'
+  const imageTag = data.kind==='image' && !data.stackLayer && imageTask && !['complete','completed'].includes(imageTask.status || '') ? <div className="image-origin-label" data-status={imageStatus} title={`${previewStatusLabel} · ${imageStatus}${data.label?' · '+data.label:''}`}><Pencil size={13}/><span>{previewStatusLabel}</span><i/><small>{imageStatus}</small></div> : null
   const cropScale = data.stackCrop ? width / data.stackCrop.width : 1
   if (data.kind === 'group') {
     const children = allNodes.filter(n => n.parentId === id)
@@ -202,7 +202,7 @@ function CardNode({ id, data, selected, positionAbsoluteX, positionAbsoluteY, wi
   </div>
   if(data.canvasImageNode)return <div className={`image-generator-node ${selected?'active':''}`}>
     <Handle type="target" position={Position.Left}/><span className="generator-ports" aria-hidden="true">·<br/>·<br/>·</span>
-    <div className="generator-identity"><span className="generator-icon"><ImagePlus size={32}/></span><strong>图像</strong><small>连接参考图，开始创作</small></div>
+    <div className="generator-identity"><span className="generator-icon"><ImagePlus size={32}/></span></div>
     {data.imageJob&&data.imageJob.status!=='complete'&&<div className="generation-overlay"><GenerationPlaceholder task={data.imageJob} action={<ImageJobControls job={data.imageJob} onChange={imageJob=>update(id,{imageJob})}/>}/></div>}
     <NodeResizer isVisible={singleSelected} minWidth={160} minHeight={100}/>
     <Handle type="source" position={Position.Right}/>
@@ -355,8 +355,15 @@ function Workspace() {
   function addComposerReferences(images: Card[]) {
     const ids = [...new Set([...referenceIds, ...images.map(n=>n.id)])]
     if (ids.length > 9) { setToast('最多支持 9 张参考图，请先移除部分图片'); return }
-    if(imageGenerator){setEdges(current=>images.reduce((all,n)=>addEdge({id:uid(),source:n.id,target:imageGenerator.id},all),current));return}
+    const first = nodes.find(n => n.id === referenceIds[0]) || images.find(n => n.id === images[0]?.id)
+    const ratio = first?.data.dimensions ? ratioFromDimensions(first.data.dimensions) : undefined
+    if(imageGenerator){
+      setEdges(current=>images.reduce((all,n)=>addEdge({id:uid(),source:n.id,target:imageGenerator.id},all),current))
+      if (ratio) update(imageGenerator.id, { generation: { ...normalizeGeneration(imageGenerator.data.generation), ratio } })
+      return
+    }
     setComposerReferenceIds(current=>[...new Set([...current,...images.map(n=>n.id)])].slice(0,9)); setDraftMode('redraw'); setComposerOpen(true)
+    if (ratio) setDraftGeneration(current => ({ ...current, ratio }))
   }
   function removeComposerReference(index:number){
     if(imageGenerator)setEdges(current=>current.filter(e=>!(e.target===imageGenerator.id&&e.source===referenceIds[index])))
@@ -679,7 +686,8 @@ function Workspace() {
     if (['generate','redraw'].includes(toolId)) {
       const input=nodes.find(n=>n.id===sourceId&&n.data.src)
       const id=uid(),position=toolPlacement(input?.id,nodes,at,flow.screenToFlowPosition({x:window.innerWidth/2,y:window.innerHeight/2}))
-      setNodes(current=>[...current.map(n=>({...n,selected:false})),{id,type:'card',position,selected:true,style:{width:340,height:210},data:{kind:'tool',canvasImageNode:true,label:'图像',tool:toolId,prompt:'',generation:{...draftGeneration}}}])
+      const ratio = input?.data.dimensions ? ratioFromDimensions(input.data.dimensions) : draftGeneration.ratio
+      setNodes(current=>[...current.map(n=>({...n,selected:false})),{id,type:'card',position,selected:true,style:{width:340,height:210},data:{kind:'tool',canvasImageNode:true,label:'图像',tool:toolId,prompt:'',generation:{...draftGeneration,ratio}}}])
       if(input)setEdges(current=>addEdge({id:uid(),source:input.id,target:id},current))
       setEditorMode('free');setDraftMode('redraw');setComposerOpen(true);setEditing(null);setMenu(null)
       return id
@@ -866,7 +874,7 @@ function Workspace() {
     const width = source.measured?.width || Number(source.style?.width) || 340, height = source.measured?.height || Number(source.style?.height) || 340
     const frame = parameters.frame
     const outputWidth = frame ? width * frame.width : width, outputHeight = frame ? height * frame.height : height
-    const generation={...normalizeGeneration(draftGeneration),...(operation==='edit'&&parameters.boxes?{model:'doubao-seedream-5-0-pro-260628'}:{}),count:1}
+    const generation={...normalizeGeneration(draftGeneration),ratio:source.data.dimensions ? ratioFromDimensions(source.data.dimensions) : draftGeneration.ratio,...(operation==='edit'&&parameters.boxes?{model:'doubao-seedream-5-0-pro-260628'}:{}),count:1}
     {
       const id = uid()
       setNodes(current => [...current.map(n => ({ ...n, selected: false })), { id, type: 'card', position: { x: sourcePosition.x + width + 55, y: sourcePosition.y }, style: { width:outputWidth, height:outputHeight }, selected: true, data: { kind: 'image', src: source.data.src, canvasOperation:operation, canvasParameters:parameters, prompt:parameters.prompt||'', generation, imagePresentationVersion: 1, label: builtinSkills[operation].name, imageJob: { status: 'submitting', message: '连接生图后台…' }, skillResult: { jobId: '', sourceNode: sourceId, baseId: sourceId, review: {} } } }])
@@ -1018,7 +1026,7 @@ function Workspace() {
       <button aria-label="预览选中图片" title="预览选中图片 · 双击图片" disabled={selected?.data.kind !== 'image' || !!selected?.data.task || !!selected?.data.imageJob && !selected.data.imageOutput} onClick={() => selected && setPreviewId(selected.id)}><Eye size={18} /></button>
       <button aria-label="切换缩略地图" aria-pressed={showMinimap} title="缩略地图" onClick={() => setShowMinimap(v => !v)}><Map size={17} /></button>
     </nav>
-    <aside className={panelOpen ? '' : 'collapsed'} inert={!panelOpen}><div className="tabs"><button className="current">图层 <small>{nodes.length - legacyGeneratorIds.size}</small></button></div><div className="layer-list">{nodes.length === 0 && <p>导入图片后，图层会显示在这里。</p>}{nodes.filter(n => !legacyGeneratorIds.has(n.id)).map(n => <button className={n.selected ? 'chosen' : ''} key={n.id} onClick={() => locateLayer(n.id)}>{n.data.kind === 'group' ? <Group size={15} /> : <ImagePlus size={15} />}<span>{n.parentId ? '↳ ' : ''}{n.data.label}</span>{n.data.final && <Check size={14} />}</button>)}</div><div className="sidebar-bottom">本地工作空间 <span>●</span></div></aside>
+      <aside className={panelOpen ? '' : 'collapsed'} inert={!panelOpen}><div className="tabs"><button className="current">图层 <small>{nodes.length - legacyGeneratorIds.size}</small></button></div><div className="layer-list">{nodes.length === 0 && <p>导入图片后，图层会显示在这里。</p>}{[...nodes].filter(n => !legacyGeneratorIds.has(n.id)).reverse().map(n => <button className={n.selected ? 'chosen' : ''} key={n.id} onClick={() => locateLayer(n.id)}>{n.data.kind === 'group' ? <Group size={15} /> : <ImagePlus size={15} />}<span>{n.parentId ? '↳ ' : ''}{n.data.label}</span>{n.data.final && <Check size={14} />}</button>)}</div><div className="sidebar-bottom">本地工作空间 <span>●</span></div></aside>
     <main className={`canvas-surface${middlePanning ? ' middle-panning' : ''}${editing ? ' canvas-editing' : ''}`} onMouseDownCapture={e => { if (e.button === 1 && (e.target as HTMLElement).closest('.react-flow')) { e.preventDefault(); setMiddlePanning(true) } }} onAuxClickCapture={e => { if (e.button === 1) e.preventDefault() }} onDragEnter={e => { if (e.dataTransfer.types.includes('Files')) { dragDepth.current++; setDraggingFile(true) } }} onDragLeave={() => { dragDepth.current = Math.max(0, dragDepth.current - 1); if (!dragDepth.current) setDraggingFile(false) }} onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }} onDrop={e => { e.preventDefault(); dragDepth.current = 0; setDraggingFile(false); void importImages(e.dataTransfer.files, flow.screenToFlowPosition({ x: e.clientX, y: e.clientY })) }}>
       <div className="canvas-heading"><span>画布 01</span><span> / </span><small>自由创作</small></div>
       {ready && <ReactFlow elevateEdgesOnSelect={false} onlyRenderVisibleElements onNodeClick={(event, node) => { if (node.data.pendingResult && !event.ctrlKey && !event.metaKey && !event.shiftKey) restoreComposer(node as Card); if(node.data.canvasImageNode){setEditorMode('free');setComposerOpen(true)} if (node.data.kind === 'image' && node.data.src && !node.data.pendingResult && !node.data.task && (!node.data.imageJob || node.data.imageOutput)) { setDirectComposerInput(node.id); if (!event.ctrlKey && !event.metaKey && !event.shiftKey) restoreComposer(node as Card); if(event.ctrlKey || event.metaKey){setEditorMode('free');addComposerReferences([node as Card])} } else { setDirectComposerInput(null) } }} onBeforeDelete={async({nodes:removed,edges:removedEdges})=>{

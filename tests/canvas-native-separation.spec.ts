@@ -116,8 +116,8 @@ test('DREO 明确拒绝拆分时显示可读提示且不提供无效的原任务
  await page.getByRole('button',{name:'切换深色主题'}).click()
  await page.locator('[data-id="base"] .image-body').click()
  await page.getByRole('button',{name:'多图层',exact:true}).click()
- await expect(page.getByText('提交未被受理')).toBeVisible()
- await expect(page.locator('.canvas-task-notice > p')).toContainText('DREO 拒绝了原生图层拆分请求')
+ await expect(page.getByText('生成失败')).toBeVisible()
+ await expect(page.locator('.canvas-task-notice > p')).toContainText('请重试或检查提示词')
  const compactWidth=(await page.locator('.canvas-task-notice').boundingBox())!.width
  expect(compactWidth).toBeLessThanOrEqual(190)
  await expect(page.locator('.canvas-task-notice > p')).toHaveCSS('white-space','nowrap')
@@ -153,7 +153,7 @@ test('视觉分析格式异常显示可读提示且不显示无效恢复按钮',
  await expect(page.getByRole('button',{name:'停止等待'})).toHaveCount(0)
 })
 
-test('多图层处理中显示预计百分比，不显示等待浮条',async({page})=>{
+test('多图层处理中复用统一生成状态卡片',async({page})=>{
  const createdAt=new Date(Date.now()-40_000).toISOString()
  await page.route('**/api/skills/canvas/tasks',async route=>{
   const body=route.request().postDataJSON()
@@ -168,13 +168,11 @@ test('多图层处理中显示预计百分比，不显示等待浮条',async({pa
  await page.locator('input[accept=".visproj"]').setInputFiles({name:'layer-progress.visproj',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(project))})
  await page.locator('[data-id="base"] .image-body').click()
  await page.getByRole('button',{name:'多图层',exact:true}).click()
- const progress=page.getByRole('progressbar',{name:'多图层预计进度'})
- await expect(progress).toBeVisible()
- await expect(progress).toContainText('正在拆分图层')
- expect(Number(await progress.getAttribute('aria-valuenow'))).toBeGreaterThan(0)
- expect(Number(await progress.getAttribute('aria-valuenow'))).toBeLessThan(100)
+ await expect(page.getByRole('progressbar')).toHaveCount(0)
+ await expect(page.locator('.processing-status .generation-progress')).toHaveText(/%$/)
+ await expect(page.locator('.processing-status .generation-primary')).toHaveText('正在拆分图层')
+ await expect(page.locator('.task-activity-track')).toHaveCount(0)
  await page.getByRole('button',{name:'切换深色主题'}).click()
  await expect(page.locator('html')).toHaveAttribute('data-theme','dark')
- await expect(page.getByRole('button',{name:'停止等待'})).toHaveCount(0)
- await expect(page.locator('.canvas-task-progress-footer')).toHaveCount(0)
+ await expect(page.locator('.processing-status .generation-primary')).toHaveText('正在拆分图层')
 })
