@@ -4,10 +4,11 @@ import {readFile} from 'node:fs/promises'
 import {configuredText,personaText,configSnapshot} from './function-config.mjs'
 import {imageRequest} from './image-request.mjs'
 import {safeTaskMessage} from './task-monitor.mjs'
+import {parseVisionJson} from './vision-response.mjs'
 const rules=await readFile(new URL('./skills/texture-restore/SKILL.md',import.meta.url),'utf8')
 const lineOptions={model:'gpt-image-2.5-sunburst',resolution:'2K',ratio:'auto',count:1}
 export function restorePlan(raw){
- const value=typeof raw==='string'?JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g,'')):raw
+ const value=typeof raw==='string'?parseVisionJson(raw):raw
  if(!value||typeof value.scene!=='string'||!value.scene.trim()||!Array.isArray(value.objects)||!value.objects.length||!value.objects.every(o=>typeof o==='string')||!value.materials||typeof value.materials!=='object'||Array.isArray(value.materials)||!Object.keys(value.materials).length||!value.lighting||typeof value.lighting!=='object'||Array.isArray(value.lighting)||!Object.keys(value.lighting).length||JSON.stringify(value).length>18000)throw Error('材质与光影分析不完整，请重新准备')
  return {scene:value.scene,objects:value.objects,materials:value.materials,lighting:value.lighting}
 }

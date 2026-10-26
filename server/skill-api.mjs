@@ -34,6 +34,7 @@ import { assetStore, assetImage, selectionPoints, selectionStrokes, analysisCand
 import {personSheetPrompt} from './person-assets.mjs'
 import {extractionTargets,extractionPrompt,extractedAssets,assetPreviewPrompt} from './asset-extraction.mjs'
 import { MODEL, validatePlan, generationRequest, runOptions } from './scene-contract.mjs'
+import { parseVisionJson } from './vision-response.mjs'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const store = process.env.CANVAS_DATA_DIR || path.join(root, '.canvas-data')
@@ -132,11 +133,23 @@ async function vision(system, images) {
   if (!visionConfigured()) throw Error('视觉分析接口未配置；请配置 CANVAS_VISION_ENDPOINT / TOKEN / MODEL，或导入已分析的 JSON 方案')
   const endpoint = new URL(visionSettings.endpoint)
   if (endpoint.protocol !== 'https:' && !['127.0.0.1', 'localhost'].includes(endpoint.hostname)) throw Error('视觉分析接口必须使用 HTTPS 或本机地址')
-  const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${visionSettings.token}` }, signal: AbortSignal.timeout(180000), redirect: 'error', body: JSON.stringify({ model: visionSettings.model, temperature: 0.1, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: images.flatMap((image, i) => [{ type: 'text', text: i === 0 ? '底图（或原始场景）' : `参考/结果 ${i}` }, { type: 'image_url', image_url: { url: image } }]) }] }) })
-  if (!res.ok) throw Error(`视觉分析失败（HTTP ${res.status}）`)
-  const response = await res.json(), content = response.choices?.[0]?.message?.content
-  if (typeof content !== 'string' || content.length > 100000) throw Error('视觉接口未返回 JSON 内容')
-  return JSON.parse(content.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, ''))
+  const messages=images.flatMap((image, i) => [{ type: 'text', text: i === 0 ? '底图（或原始场景）' : `参考/结果 ${i}` }, { type: 'image_url', image_url: { url: image } }])
+  async function request(extra=''){
+   const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${visionSettings.token}` }, signal: AbortSignal.timeout(180000), redirect: 'error', body: JSON.stringify({ model: visionSettings.model, temperature: 0.1, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system + extra }, { role: 'user', content: messages }] }) })
+   if (!res.ok) throw Error(`视觉分析失败（HTTP ${res.status}）`)
+   let response
+   try { response = await res.json() } catch { throw Error('视觉分析接口返回格式无效，请检查视觉模型配置') }
+   const content=response.choices?.[0]?.message?.content
+   if(typeof content!=='string'||content.length>100000)throw Object.assign(Error('视觉接口未返回 JSON 内容'),{code:'VISION_INVALID_JSON'})
+   return content
+  }
+  const content=await request()
+  try{return parseVisionJson(content)}
+  catch(error){
+   if(error?.code!=='VISION_INVALID_JSON')throw error
+   const retry=await request(String.fromCharCode(10)+'格式纠正：上一次输出无法解析。现在只输出一个完整 JSON 对象，不要解释、不要 Markdown 代码块，不要在 JSON 前后添加任何文字。')
+   return parseVisionJson(retry)
+  }
 }
 function ratioFor(width, height) {
   const list = ['1:1','4:3','3:4','16:9','9:16','3:2','2:3','4:5','5:4','21:9']

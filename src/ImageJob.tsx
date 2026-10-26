@@ -41,8 +41,9 @@ export function ImageJob({ job, onChange, onResults, endpoint = 'images', monito
 export function ImageJobControls({job,onChange}:{job:ImageJobState;onChange:(job:ImageJobState)=>void}){
  const unresolved=['connection_lost','needs_attention','submission_unknown','paused'].includes(job.status)
  if(job.status==='complete'||job.status==='submit_error')return null
+ const hasRemoteTask=!!job.taskId
  return <div className="task-recovery-actions nodrag nopan" onPointerDown={e=>e.stopPropagation()}>
- {(unresolved||job.monitoringStopped)&&job.canQueryOriginal!==false&&<button title="只查询原任务，不重复生成" onClick={()=>onChange({...job,status:'restoring',monitoringStopped:false,queryAttempt:(job.queryAttempt||0)+1,message:'正在重新查询原任务…'})}>查询原任务</button>}
- {!job.monitoringStopped&&<button title="只停止本地等待，不取消远端任务" onClick={()=>onChange({...job,status:'paused',monitoringStopped:true,message:'已停止本地等待，远端任务可能继续；可查询原任务找回结果。'})}>停止等待</button>}
+ {(unresolved||job.monitoringStopped)&&hasRemoteTask&&job.canQueryOriginal!==false&&<button title="只查询原任务，不重复生成" onClick={()=>onChange({...job,status:'restoring',monitoringStopped:false,queryAttempt:(job.queryAttempt||0)+1,message:'正在重新查询原任务…'})}>查询原任务</button>}
+ {!job.monitoringStopped&&!unresolved&&hasRemoteTask&&<button title="只停止本地等待，不取消远端任务" onClick={()=>onChange({...job,status:'paused',monitoringStopped:true,message:'已停止本地等待，远端任务可能继续；可查询原任务找回结果。'})}>停止等待</button>}
  </div>
 }

@@ -18,6 +18,10 @@ test('preparation and final submission preserve inputs, aspect and idempotency',
 })
 test('style reference is included only on explicit choice',async()=>{const f=fixture(),id=await ready(f);await f.route('POST','/run',{preparationId:id,confirmed:true,includeReference:true,supplement:'',options:{model:'doubao-seedream-5-0-pro-260628',ratio:'auto',count:4}});assert.deepEqual(f.calls[1].images,['line','ref'])})
 test('incomplete visual analysis is rejected',()=>{assert.throws(()=>restorePlan({scene:'room',objects:[],materials:{},lighting:{}}));assert.deepEqual(restorePlan(plan),plan)})
+test('visual analysis JSON may be wrapped in prose or a markdown fence',()=>{
+ const wrapped='分析完成：\n```json\n'+JSON.stringify(plan)+'\n```\n'
+ assert.deepEqual(restorePlan(wrapped),plan)
+})
 
 test('previous registry versions gain restoration without changing existing switches',async()=>{const {defaults,validateConfig}=await import('../server/function-config.mjs');const old=await defaults();old.features=old.features.filter(f=>f.id!=='texture-restore');old.features[0].enabled=false;const updated=validateConfig(old);assert.equal(updated.features.find(f=>f.id==='texture-restore').enabled,true);assert.equal(updated.features[0].enabled,false)})
 

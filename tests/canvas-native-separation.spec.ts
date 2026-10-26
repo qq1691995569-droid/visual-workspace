@@ -132,6 +132,27 @@ test('DREO 明确拒绝拆分时显示可读提示且不提供无效的原任务
  await expect(page.locator('html')).toHaveAttribute('data-theme','light')
 })
 
+test('视觉分析格式异常显示可读提示且不显示无效恢复按钮',async({page})=>{
+ await page.route('**/api/skills/canvas/tasks',async route=>{
+  const body=route.request().postDataJSON()
+  await route.fulfill({json:{id:body.requestId,status:'analyzing',message:'正在识别对象'}})
+ })
+ await page.route('**/api/skills/images/tasks/*',async route=>{
+  const id=route.request().url().split('/').at(-1)
+  await route.fulfill({json:{id,status:'paused',message:'Unexpected token \'根\', "根据\\n您的要求"... is not valid JSON',images:[]}})
+ })
+ await page.goto('/')
+ const project={format:'visproj',schemaVersion:1,name:'视觉格式异常测试',viewport:{x:0,y:0,zoom:1},edges:[],nodes:[{id:'base',type:'card',position:{x:300,y:240},style:{width:240,height:240},data:{kind:'image',src,label:'底图'}}]}
+ await page.locator('input[accept=".visproj"]').setInputFiles({name:'vision-format-error.visproj',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(project))})
+ await page.locator('[data-id="base"] .image-body').click()
+ await page.getByRole('button',{name:'多图层',exact:true}).click()
+ await expect(page.getByText('视觉分析未完成')).toBeVisible()
+ await expect(page.locator('.canvas-task-notice > p')).toContainText('未按要求返回结构化结果')
+ await expect(page.locator('.canvas-task-notice')).not.toContainText('Unexpected token')
+ await expect(page.getByRole('button',{name:'查询原任务'})).toHaveCount(0)
+ await expect(page.getByRole('button',{name:'停止等待'})).toHaveCount(0)
+})
+
 test('多图层处理中显示预计百分比，不显示等待浮条',async({page})=>{
  const createdAt=new Date(Date.now()-40_000).toISOString()
  await page.route('**/api/skills/canvas/tasks',async route=>{
