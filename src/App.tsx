@@ -15,6 +15,7 @@ import { CanvasImage } from './CanvasImage'
 import { CanvasBackground } from './CanvasBackground'
 import {ImageDimensions} from './ImageDimensions'
 import {prepareUploadedImage} from './imageImport'
+import {prepareLocalEditSubmission} from './localEditSubmission'
 import {syncMaterialReferences,unlinkMaterialReferences} from './materialReferences'
 import {latestProjectWriter} from './projectPersistence'
 import {rowSelection,arrangeCanvas,arrangeWorkflow,avoidExpandedOverlap,toolPlacement,type Arrangement} from './canvasArrangement'
@@ -840,12 +841,13 @@ function Workspace() {
     if(sending.current.has(sourceId) || owner.data.imageJob && !['complete','paused','submit_error'].includes(owner.data.imageJob.status)) throw Error('当前图片任务仍在处理，请等待完成')
     const prior=owner.data.imageJob
     const requestId=prior?.status==='submit_error' && prior.requestId && JSON.stringify(owner.data.localEdit)===JSON.stringify(recipe) && JSON.stringify(owner.data.generation)===JSON.stringify(options) ? prior.requestId : uid()
-    sending.current.add(sourceId)
+    sending.current.add(sourceId);setSubmittingIds(new Set(sending.current))
     try {
       // Keep the selected input intact. All versions use the shared four-slot lifecycle.
       update(sourceId,{...(modification!==undefined?{submittedRefinement:{jobId:requestId,prompt:modification}}:{}),tool:recipe.kind==='material'?'material':'furniture',localEdit:recipe,imageOutput:owner.data.kind==='image',generation:options,prompt:recipe.supplement,...(owner.data.kind==='tool'?{skillState:{baseId:inputId,options:{...options},supplement:recipe.supplement}}:{skillResult:owner.data.skillResult || {jobId:'',sourceNode:sourceId,baseId:inputId,review:{}}}),imageJob:{requestId,status:'submitting',phase:recipe.deferredSelection?{step:1,total:4}:undefined,message:recipe.deferredSelection?'步骤 1/4 · 准备后台识别对象':'正在准备局部编辑与像素保护…'}})
       if(modification!==undefined){clearComposer();setNodes(current=>current.map(n=>({...n,selected:false})))}
-      const response=await fetch('/api/skills/assets/edit/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requestId,base:source.data.src,edit:recipe,options})})
+      const prepared=await prepareLocalEditSubmission(source.data.src,recipe)
+      const response=await fetch('/api/skills/assets/edit/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requestId,...prepared,options})})
       const job=await response.json()
       if(!response.ok) throw Error(job.error || '局部编辑提交失败')
       update(sourceId,{generation:{...options,ratio:(job.ratio || options.ratio) as Generation['ratio']},imageJob:{id:job.id,requestId,phase:job.phase,createdAt:job.createdAt,status:job.status,message:job.message,serverNow:job.serverNow}})
@@ -853,7 +855,7 @@ function Workspace() {
       const message=error instanceof Error?error.message:'提交未确认'
       update(sourceId,{imageJob:{requestId,status:'submit_error',message:`${message}；重试会核对同一请求，避免重复提交`}})
       throw Error(message)
-    } finally {sending.current.delete(sourceId)}
+    } finally {sending.current.delete(sourceId);setSubmittingIds(new Set(sending.current))}
   }
   function quickAction(operation: string, id: string) {
     if(!functionEnabled(operation)){setToast('此功能已由管理员关闭');return}

@@ -7,7 +7,7 @@ export function ImageJob({ job, onChange, onResults, endpoint = 'images', monito
   useEffect(() => { latest.current = { job, onChange, onResults } })
   useEffect(() => {
     const id = job.id || job.requestId
-    if (submitting || !monitor || !id || job.monitoringStopped || ['connection_lost','needs_attention','submit_error','failed','error','cancelled','canceled'].includes(job.status)) return
+    if ((job.status==='submitting' && !job.id) || submitting || !monitor || !id || job.monitoringStopped || ['connection_lost','needs_attention','submit_error','failed','error','cancelled','canceled'].includes(job.status)) return
     let stopped = false, failures = 0, timer: ReturnType<typeof setTimeout>
     const controller = new AbortController()
     async function poll() {

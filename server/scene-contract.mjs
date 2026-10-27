@@ -21,7 +21,15 @@ export function validatePlan(raw, protection, supplement = '') {
     if (!Array.isArray(raw.adjustments) || raw.adjustments.length > 100 || !raw.adjustments.every(a => a && ['builtin','user','resolution'].every(key => typeof a[key] === 'string'))) throw Error('需要有效规则调整记录')
     plan.resolvedInstructions = raw.resolvedInstructions; plan.execution = raw.execution; plan.adjustments = raw.adjustments; plan.userSupplement = supplement
   }
-  if ((!supplement || plan.execution.product === 'preserve') && !plan.targetSurfaces.some(s => s.preserve)) throw Error('方案缺少产品保护表面')
+  const protectProduct = !supplement || plan.execution.product === 'preserve'
+  if (raw.productAssessment !== undefined) {
+    const assessment = raw.productAssessment
+    if (!assessment || !['present','absent','uncertain'].includes(assessment.status) || !Array.isArray(assessment.surfaceIds) || assessment.surfaceIds.length > 100 || !assessment.surfaceIds.every(id => typeof id === 'string' && ids.has(id)) || new Set(assessment.surfaceIds).size !== assessment.surfaceIds.length) throw Error('产品存在性及对应表面无效')
+    const evidence = text(assessment.evidence, '产品存在性依据')
+    if (assessment.status === 'absent' ? assessment.surfaceIds.length !== 0 : assessment.surfaceIds.length === 0) throw Error('产品存在性与对应表面不一致')
+    if (protectProduct && assessment.surfaceIds.some(id => !plan.targetSurfaces.find(s => s.id === id)?.preserve)) throw Error('方案缺少实际产品保护表面')
+    plan.productAssessment = {status:assessment.status,evidence,surfaceIds:[...assessment.surfaceIds]}
+  } else if (protectProduct && !plan.targetSurfaces.some(s => s.preserve)) throw Error('方案缺少产品存在性判断或产品保护表面')
   plan.protection = text(protection, '产品保护范围')
   return plan
 }

@@ -43,3 +43,34 @@ test('生图参数按模型能力校验，不静默降级画质或修改张数',
   assert.throws(() => runOptions({ count: 5 }, routes, '3:4'))
   assert.throws(() => runOptions({ model: 'unknown' }, routes, '3:4'))
 })
+
+
+test('无产品纯场景可迁移所有表面，存在性判断传入最终生图请求',()=>{
+ const raw=sample();raw.targetSurfaces.pop();delete raw.materials.产品
+ raw.productAssessment={status:'absent',evidence:'底图只有墙面和家具，未见家电或指定商品',surfaceIds:[]}
+ const plan=validatePlan(raw,'保留实际存在的人物动物')
+ assert.equal(plan.targetSurfaces.some(s=>s.preserve),false)
+ assert.deepEqual(JSON.parse(generationRequest(plan,['gray','line'],'1:1',rules).params.prompt).productAssessment,raw.productAssessment)
+})
+test('有产品不能用无关墙面保留项替代真实产品保护',()=>{
+ const raw=sample();raw.productAssessment={status:'present',evidence:'右侧可见空气净化器',surfaceIds:['p1']}
+ assert.equal(validatePlan(raw,'产品').productAssessment.status,'present')
+ raw.targetSurfaces[1]={...raw.targetSurfaces[0],id:'p1',target:'空气净化器'}
+ raw.targetSurfaces[0]={id:'t1',target:'墙面',match:'preserve',preserve:true,uncertain:false,reason:'无对应材质'}
+ assert.throws(()=>validatePlan(raw,'产品'),/实际产品保护/)
+})
+test('缺失、矛盾和不确定产品识别不能静默当成无产品',()=>{
+ const raw=sample();raw.targetSurfaces.pop()
+ for(const assessment of [undefined,{status:'absent',evidence:'',surfaceIds:[]},{status:'absent',evidence:'无人房间',surfaceIds:['t1']},{status:'uncertain',evidence:'角落看不清',surfaceIds:[]},{status:'present',evidence:'右侧产品',surfaceIds:['missing']}]){
+  raw.productAssessment=assessment;assert.throws(()=>validatePlan(raw,'产品'))
+ }
+ const uncertain=sample();uncertain.productAssessment={status:'uncertain',evidence:'疑似设备，需要保守保护',surfaceIds:['p1']}
+ assert.equal(validatePlan(uncertain,'产品').productAssessment.status,'uncertain')
+})
+test('有产品且用户明确授权改色，仍允许有界覆盖',()=>{
+ const raw=sample();raw.productAssessment={status:'present',evidence:'右侧产品',surfaceIds:['p1']}
+ raw.targetSurfaces[1]={...raw.targetSurfaces[0],id:'p1',target:'产品机身',color:'蓝色'}
+ raw.execution={geometry:'preserve',product:'user_override',lighting:'preserve'}
+ raw.resolvedInstructions=['仅产品机身改蓝，其余保持'];raw.adjustments=[]
+ assert.equal(validatePlan(raw,'其余保护','产品机身改蓝').execution.product,'user_override')
+})
