@@ -28,6 +28,8 @@ test('图片快捷功能统一显示生成状态卡片并支持深色主题', as
     await expect(node.getByRole('progressbar')).toHaveCount(0)
     await expect(node.locator('.canvas-task-progress,.generation-status')).toHaveCount(0)
     await expect(node.locator('.processing-status .generation-progress')).toHaveText(/%$/)
+    await expect(node.locator('.processing-status .generation-progress')).toHaveCSS('font-size', /26px|32px/)
+    await expect(node.locator('.processing-dot-field')).toHaveCSS('mask-image', /radial-gradient/)
     await expect(node.locator('.processing-status .generation-primary')).toHaveText(operation === 'separate' ? label : '正在生成')
     await expect(node.locator('.processing-status .generation-eyebrow')).toHaveCount(0)
     await expect(node.locator('.processing-status .generation-primary')).toHaveCSS('font-size', /12px|15px|14px/)
@@ -36,8 +38,11 @@ test('图片快捷功能统一显示生成状态卡片并支持深色主题', as
     await expect(node.locator('.task-activity-track')).toHaveCount(0)
     await expect(node.getByRole('button', { name: '停止等待' })).toHaveCount(0)
     await expect(node.locator('.processing-dot-array')).toHaveCount(1)
+    const radius=await node.locator('.clean-image').evaluate(el=>getComputedStyle(el).borderRadius)
+    await expect(node.locator('.generation-overlay')).toHaveCSS('border-radius',radius)
+    await expect(node.locator('.image-processing')).toHaveCSS('border-radius',radius)
   }
-  await expect(page.locator('[data-id="progress-0"] .task-preview-shade')).toHaveCSS('backdrop-filter', /blur\(10px\)/)
+  await expect(page.locator('[data-id="progress-0"] .task-preview-shade')).toHaveCSS('backdrop-filter', 'none')
   await page.locator('[data-id="progress-0"]').evaluate(node => (node as HTMLElement).style.setProperty('--image-hover-scale', '1.8'))
   const statusScale = await page.locator('[data-id="progress-2"] .processing-status').evaluate(element => {
     const transform = getComputedStyle(element).transform

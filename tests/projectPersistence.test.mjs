@@ -14,3 +14,15 @@ test('保存失败保留待写快照，刷新保护持续生效，恢复后保�
  writer.enqueue('image');assert.equal(await writer.flush(),false);assert.equal(writer.dirty(),true)
  fail=false;writer.enqueue('both images');assert.equal(await writer.flush(),true);assert.equal(stored,'both images');assert.equal(writer.dirty(),false)
 })
+
+test('延迟保存合并连续框选，显式 flush 在延迟结束前保存最新快照',async()=>{
+ const stored=[];const writer=latestProjectWriter(async v=>{stored.push(v)},()=>{},1000)
+ for(let i=0;i<300;i++)writer.enqueue(i)
+ await Promise.resolve();assert.deepEqual(stored,[]);assert.equal(writer.dirty(),true)
+ assert.equal(await writer.flush(),true);assert.deepEqual(stored,[299]);assert.equal(writer.dirty(),false)
+})
+test('延迟保存无需额外操作也会落盘',async()=>{
+ const stored=[];const writer=latestProjectWriter(async v=>{stored.push(v)},()=>{},10)
+ writer.enqueue('final');await new Promise(r=>setTimeout(r,40))
+ assert.deepEqual(stored,['final']);assert.equal(writer.dirty(),false)
+})

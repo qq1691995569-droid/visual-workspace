@@ -1,8 +1,8 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { memo, useEffect, useState, useSyncExternalStore } from 'react'
 import { settledZoom, subscribeSettledZoom } from './settledViewport'
 import { acquireCanvasPreview } from './canvasPreviewCache'
 
-export function CanvasImage({ src, alt, width, height }: { src: string; alt: string; width: number; height: number }) {
+export const CanvasImage = memo(function CanvasImage({ src, alt, width, height }: { src: string; alt: string; width: number; height: number }) {
   // Subscribe to resolution tiers, not every pan/zoom step.
   const edge = useSyncExternalStore(subscribeSettledZoom, () => {
     const pixels = Math.max(width, height) * settledZoom() * window.devicePixelRatio
@@ -28,4 +28,4 @@ export function CanvasImage({ src, alt, width, height }: { src: string; alt: str
   }, [src, edge])
   // Do not decode hundreds of full-size originals while thumbnails are queued.
   return <img src={preview?.src === src ? preview.url : undefined} alt={alt} draggable={false} decoding="async" />
-}
+})

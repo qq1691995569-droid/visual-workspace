@@ -7,7 +7,7 @@ export function ImageJob({ job, onChange, onResults, endpoint = 'images', monito
   useEffect(() => { latest.current = { job, onChange, onResults } })
   useEffect(() => {
     const id = job.id || job.requestId
-    if (submitting || !monitor || !id || job.monitoringStopped || ['connection_lost','needs_attention','submit_error'].includes(job.status)) return
+    if (submitting || !monitor || !id || job.monitoringStopped || ['connection_lost','needs_attention','submit_error','failed','error','cancelled','canceled'].includes(job.status)) return
     let stopped = false, failures = 0, timer: ReturnType<typeof setTimeout>
     const controller = new AbortController()
     async function poll() {
@@ -25,7 +25,7 @@ export function ImageJob({ job, onChange, onResults, endpoint = 'images', monito
         if (result.images?.length) await latest.current.onResults(result.id, result.images)
         if (stopped) return
         latest.current.onChange({ ...latest.current.job, aliasJobIds:result.aliasJobIds, taskId:result.taskId, provider:result.provider, canQueryOriginal:result.canQueryOriginal, phase:result.phase, createdAt: result.createdAt, finishedAt: result.finishedAt, serverNow: result.serverNow, id: result.id, status: result.status, message: [result.message, result.warning].filter(Boolean).join('；') })
-        if (['complete','paused','submission_unknown','submit_error','connection_lost','needs_attention'].includes(result.status)) return
+        if (['complete','completed','failed','error','cancelled','canceled','paused','submission_unknown','submit_error','connection_lost','needs_attention'].includes(result.status)) return
       } catch {
         if (stopped) return
         failures++

@@ -1,6 +1,31 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {lightingPlan} from '../server/lighting.mjs'
+
+test('滑块编译为可观察的软硬、光比和冷暖目标，而不是仅提交数字',()=>{
+ const soft=lightingPlan({sunlight:true,hardness:22,direction:'right',weather:'sunny'})
+ assert.match(soft.prompt,/22\/100：柔和.*明显羽化/)
+ assert.match(soft.prompt,/背离光源/)
+ assert.doesNotMatch(soft.prompt,/投影方向与光源一致/)
+ assert.match(lightingPlan({hardness:90}).prompt,/边缘锐利/)
+ assert.match(lightingPlan({hardness:0}).prompt,/宽阔、连续的半影/)
+ assert.match(lightingPlan({intensity:15}).prompt,/只有轻微亮度差/)
+ assert.match(lightingPlan({intensity:95}).prompt,/鲜明光比/)
+ assert.match(lightingPlan({temperature:-80}).prompt,/冷白、浅蓝/)
+ assert.match(lightingPlan({temperature:80}).prompt,/暖白、金黄/)
+ assert.equal(soft.promptRevision,2)
+ assert.match(soft.prompt,/不得覆盖显式滑块目标/)
+})
+
+test('阳光开关开启但强度为零时，不同时要求引入直射光',()=>{
+ const plan=lightingPlan({sunlight:true,intensity:0,hardness:90})
+ assert.equal(plan.effective.intensity,0)
+ assert.match(plan.prompt,/无太阳直射贡献/)
+ assert.doesNotMatch(plan.prompt,/引入太阳直射光/)
+ assert.equal(plan.effective.hardness,undefined)
+ assert.doesNotMatch(plan.prompt,/边缘锐利/)
+ assert.equal(plan.adjustments.length,1)
+})
 test('光影启用值与零值有效，关闭阳光不提交强度，移除与缓存不参与生成',()=>{
  const plan=lightingPlan({sunlight:false,temperature:0,intensity:80,hardness:30,hiddenModules:['lamps'],lamps:'on',remembered:{direction:'left'}},'暗部不要太黑')
  assert.deepEqual(plan.effective,{sunlight:false,temperature:0});assert.match(plan.prompt,/中性/);assert.match(plan.prompt,/暗部不要太黑/)

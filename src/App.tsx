@@ -1,3 +1,4 @@
+import { isGenerationFailure } from './generationFailure'
 import {mergeTaskAliases} from './taskAliases'
 import {TextureRestoreNode,textureDefaults,type TextureState} from './TextureRestoreNode'
 import {FunctionFlagsProvider,useFunctionEnabled} from './functionFlags'
@@ -82,6 +83,15 @@ const canvasTaskLabels: Record<BuiltinOperation, string> = {
 const sidebarTools = tools.filter(tool => canvasToolOrder.includes(tool.id)).sort((a,b)=>canvasToolOrder.indexOf(a.id)-canvasToolOrder.indexOf(b.id)).map(tool => skillIds.includes(tool.id) ? { ...tool, name: tool.name, detail: tool.id === 'texture-restore' ? tool.detail : tool.id === 'tone-skill' ? '底图与参考图匹配色调 · 本地处理' : tool.id === 'style' ? '灰度与线稿控制 · 逐表面材质迁移' : ['material','furniture'].includes(tool.id) ? '点选对象 · 从资产库绑定外观' : '调整光线方向、明暗与色温' } : tool)
 
 type Card = Node<{ textureState?:TextureState; upscaleState?:UpscaleState; toneSettings?: ToneSettings; canvasImageNode?:boolean; generatedSkill?:string; canvasParameters?:InlineParameters; canvasOperation?:BuiltinOperation; extraction?:ExtractionTask; extractedAsset?:ExtractedAsset; label: string; kind: 'image' | 'tool' | 'group'; src?: string; previewSrc?: string; version?: {parentId?:string;parentLabel?:string;revision:number}; tool?: string; prompt?: string; final?: boolean; dimensions?: string; generation?: Generation; imageJob?: ImageJobState; imageOutput?: boolean; skillState?: SkillState; composerRequest?: { id: string; referenceIds?: string[]; input?: {id:string;src:string;original?:string} }; localEdit?: LocalEditRecipe; comparison?: { original: string; input?: string }; skillResult?: { jobId: string; sourceNode: string; baseId?: string; review: Record<string,string> }; refinementDraft?: { prompt: string; options: SkillOptions }; submittedRefinement?: {jobId:string;prompt:string}; iterationContext?: { modification?:string; lighting?: SkillState['lighting']; tool: string; prompt: string; referenceIds: string[]; options: SkillOptions }; pendingResult?: { jobId: string; sourceNode: string; index: number; endpoint?: 'style' | 'images'; task?: ImageJobState }; provenanceLinked?: boolean; imagePresentationVersion?: number; task?: QuickTask; collectionManaged?: boolean; collapsed?: boolean; expandedSize?: { width: number; height: number }; layerStack?: boolean; layerLayoutVersion?: number; stackLayer?: boolean; stackCrop?: StackCrop; transparentLayer?: boolean; layerIndex?: number }, 'card'>
+function imageOperationName(data?: Card['data']): string | undefined {
+  if (!data) return undefined
+  return (data.canvasOperation ? builtinSkills[data.canvasOperation]?.name : undefined)
+    || (data.extraction || data.extractedAsset ? '资产提取' : undefined)
+    || (data.localEdit ? data.localEdit.kind === 'material' ? '材质优化' : '模型替换' : undefined)
+    || data.generatedSkill
+    || tools.find(t => t.id === (data.iterationContext?.tool || data.tool))?.name
+}
+
 type Project = { format: 'visproj'; schemaVersion: 1; name: string; nodes: Card[]; edges: Edge[]; viewport: Viewport; draft?: { referenceIds?: string[]; prompt: string; generation: Generation; mode: 'generate' | 'redraw' } }
 const Actions = createContext<{ skillResults: (id: string, job: string, images: SkillResult[]) => void; update: (id: string, data: Partial<Card['data']>) => void; run: (id: string) => void; addTool: (tool: string, source: string) => void; toggle: (id: string) => void; ungroup: (id: string) => void; select: (id: string) => void; selectLayer: (id: string) => void; quick: (operation: string, id: string) => void; editing: { id: string; operation: BuiltinOperation } | null; cancelEdit: () => void; confirmEdit: (parameters: InlineParameters) => void }>({ skillResults: () => {}, update: () => {}, run: () => {}, addTool: () => {}, toggle: () => {}, ungroup: () => {}, select: () => {}, selectLayer: () => {}, quick: () => {}, editing: null, cancelEdit: () => {}, confirmEdit: () => {} })
 const uid = () => crypto.randomUUID()
@@ -124,9 +134,20 @@ function validate(raw: unknown): Project {
   if (!p.viewport || !Number.isFinite(p.viewport.x) || !Number.isFinite(p.viewport.y) || !Number.isFinite(p.viewport.zoom) || p.viewport.zoom <= 0) throw Error('项目视图数据无效')
   return p
 }
+// Cache once per immutable node snapshot, rather than scan for every selected card.
+const idleConnectionData = {transmitting:false}
+const activeConnectionData = {transmitting:true}
+const singleSelectionCache = new WeakMap<Node[], string | null>()
+function singleSelectedNode(nodes:Node[]) {
+  if(singleSelectionCache.has(nodes))return singleSelectionCache.get(nodes)
+  let id:string|null=null
+  for(const node of nodes)if(node.selected){if(id!==null){id=null;break}id=node.id}
+  singleSelectionCache.set(nodes,id)
+  return id
+}
 function CardNode({ id, data, selected, positionAbsoluteX, positionAbsoluteY, width = 340, height = 340 }: NodeProps<Card>) {
   const flow = useReactFlow<Card>()
-  const singleSelected = useStore(state=>selected&&state.nodes.filter(n=>n.selected).length===1)
+  const singleSelected = useStore(state=>selected&&singleSelectedNode(state.nodes)===id)
   // Panning only affects overlays on the selected image, not every node body.
   const transform = useStore(state => singleSelected ? state.transform : [0, 0, data.kind === 'tool' ? state.transform[2] : 1], (a,b)=>a[0]===b[0]&&a[1]===b[1]&&a[2]===b[2])
   const nodeViewport = {x:transform[0],y:transform[1],zoom:transform[2]}
@@ -161,11 +182,12 @@ function CardNode({ id, data, selected, positionAbsoluteX, positionAbsoluteY, wi
    else if(pendingSource?.skillState?.jobId===jobId)update(sourceId,{skillState:{...pendingSource.skillState,...task,jobId}})
    else update(id,{pendingResult:{...data.pendingResult!,task}})
   }}/>:undefined
-  const imageTask = data.extraction ? {status:data.extraction.itemStatus || data.extraction.status} : (data.pendingResult ? pendingJob || {status:'restoring'} : data.imageJob)
-  const imageSkill = data.generatedSkill || (data.canvasOperation ? builtinSkills[data.canvasOperation]?.name : undefined) || (data.extraction || data.extractedAsset ? '资产提取' : data.localEdit ? data.localEdit.kind==='material'?'材质优化':'模型替换' : tools.find(t=>t.id===(data.iterationContext?.tool || data.tool))?.name)
-  const imageStatus = data.task ? '待处理' : imageTask && !['complete','completed'].includes(imageTask.status || '') ? ['paused','needs_attention','submit_error','submission_unknown','connection_lost','failed'].includes(imageTask.status || '') ? '需处理' : imageTask.status==='restoring'?'查询中':'生成中' : '已完成'
-  const previewStatusLabel = imageTask && !['complete','completed'].includes(imageTask.status || '') ? '图片编辑' : imageSkill || data.label || '图片生成'
-  const imageTag = data.kind==='image' && !data.stackLayer && imageTask && !['complete','completed'].includes(imageTask.status || '') ? <div className="image-origin-label" data-status={imageStatus} title={`${previewStatusLabel} · ${imageStatus}${data.label?' · '+data.label:''}`}><Pencil size={13}/><span>{previewStatusLabel}</span><i/><small>{imageStatus}</small></div> : null
+  const imageTask = data.extraction ? {status:data.extraction.itemStatus || data.extraction.status,message:data.extraction.itemMessage || data.extraction.message} : (data.pendingResult ? pendingJob || {status:'restoring'} : data.imageJob)
+  const imageSkill = imageOperationName(data) || imageOperationName(pendingSource)
+  const compactOutputFailure = !data.src && !data.previewSrc && pendingSource?.tool !== 'tone-skill' && data.tool !== 'tone-skill' && isGenerationFailure(imageTask)
+  const imageStatus = compactOutputFailure || !!(data.src || data.previewSrc) && isGenerationFailure(imageTask) ? '失败' : data.task ? '待处理' : imageTask && !['complete','completed'].includes(imageTask.status || '') ? ['cancelled','canceled'].includes(imageTask.status || '') ? '已取消' : ['paused','needs_attention','submit_error','submission_unknown','connection_lost','failed','error'].includes(imageTask.status || '') ? '需处理' : imageTask.status==='restoring'?'查询中':'生成中' : '已完成'
+  const previewStatusLabel = imageSkill || (data.pendingResult?.endpoint === 'style' ? '风格转换' : '图像')
+  const imageTag = data.kind==='image' && !data.stackLayer && imageTask && !['complete','completed'].includes(imageTask.status || '') ? <div className="image-origin-label" data-status={imageStatus} title={`${previewStatusLabel} · ${imageStatus}${data.label?' · '+data.label:''}`}>{compactOutputFailure?<ImagePlus size={13}/>:<Pencil size={13}/>}<span>{previewStatusLabel}</span><i/><small>{imageStatus}</small></div> : null
   const cropScale = data.stackCrop ? width / data.stackCrop.width : 1
   if (data.kind === 'group') {
     const children = allNodes.filter(n => n.parentId === id)
@@ -185,7 +207,7 @@ function CardNode({ id, data, selected, positionAbsoluteX, positionAbsoluteY, wi
   }
   if(data.extraction&&!data.src)return <>{imageTag}<GenerationPlaceholder task={{...data.extraction,status:data.extraction.itemStatus||data.extraction.status,message:data.extraction.itemMessage||data.extraction.message}} index={data.extraction.index}><Handle type="target" position={Position.Left}/></GenerationPlaceholder></>
   if (data.kind === 'image' && data.pendingResult) {
-    return <>{imageTag}<GenerationPlaceholder task={pendingJob || { status: 'restoring', message: '正在查询原任务状态，请稍候' }} index={data.pendingResult.index} action={pendingControls}><Handle type="target" position={Position.Left} />{data.imageJob && <Handle type="source" position={Position.Right} />}</GenerationPlaceholder></>
+    return <>{imageTag}<GenerationPlaceholder compactFailure={pendingSource?.tool !== 'tone-skill'} task={pendingJob || { status: 'restoring', message: '正在查询原任务状态，请稍候' }} index={data.pendingResult.index} action={pendingControls}><Handle type="target" position={Position.Left} />{data.imageJob && <Handle type="source" position={Position.Right} />}</GenerationPlaceholder></>
   }
   if (data.kind === 'image') return <div ref={cardRef} style={{'--image-hover-scale':'var(--port-scale, 1)','--image-meta-scale':`min(var(--port-scale, 1), ${width/210})`} as React.CSSProperties} className={['card image clean-image', data.stackLayer ? 'stack-layer' : '', data.stackCrop ? 'stack-cropped' : '', data.skillResult && !data.pendingResult && (!data.imageJob || data.imageOutput) ? 'generation-result' : '', selected ? 'active' : '', data.collapsed ? 'folded-image' : ''].join(' ')}>
     {imageTag}
@@ -243,7 +265,7 @@ function Workspace() {
   const [saveStatus, setSaveStatus] = useState('正在读取')
   const persistenceAllowed=useRef(false),hydrationFlow=useRef(flow)
   const restackedFocus=useRef<string | undefined>(undefined)
-  const [projectWriter]=useState(()=>latestProjectWriter<Project>(p=>writeCanvasProject(p),state=>setSaveStatus(state==='saved'?'已保存在此浏览器':state==='saving'?'正在保存':'保存失败，请导出备份')))
+  const [projectWriter]=useState(()=>latestProjectWriter<Project>(p=>writeCanvasProject(p),state=>setSaveStatus(state==='saved'?'已保存在此浏览器':state==='saving'?'正在保存':'保存失败，请导出备份'),250))
   const [toast, setToast] = useState('')
   const [assetSession, setAssetSession] = useState<AssetSession | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
@@ -464,7 +486,8 @@ function Workspace() {
   let animatedConnections = 0
   const visibleEdges: Edge[] = edges.map(edge => {
     const projected=groupConnection(edge,nodeLookup,focused,selectedIds,legacyGeneratorIds)
-    return {...projected,type:'editable',data:{...edge.data,transmitting:projected.source===edge.source&&projected.target===edge.target&&(taskRunning(nodeLookup.get(edge.target)?.data)||taskRunning(nodeLookup.get(edge.source)?.data))&&!projected.hidden&&animatedConnections++<48}}
+    const transmitting=projected.source===edge.source&&projected.target===edge.target&&(taskRunning(nodeLookup.get(edge.target)?.data)||taskRunning(nodeLookup.get(edge.source)?.data))&&!projected.hidden&&animatedConnections++<48
+    return {...projected,type:'editable',data:edge.data?{...edge.data,transmitting}:transmitting?activeConnectionData:idleConnectionData}
   })
   return { displayNodes, visibleEdges }
   }, [nodes, edges, focused, selectedIds, legacyGeneratorIds])
@@ -546,7 +569,7 @@ function Workspace() {
     const dimensions = base?.data.dimensions?.match(/(\d+)\s*×\s*(\d+)/)
     const ratio = options?.ratio && options.ratio !== 'auto' ? options.ratio.split(':').map(Number) : dimensions ? [Number(dimensions[1]), Number(dimensions[2])] : [3, 4]
     const at = nextBatchPosition(source.id, current, {count,height:340 * ratio[1] / ratio[0]})
-    return [...current, ...missing.map((index,offset): Card => ({ id: `skill-${job}-${index}`, type: 'card', position: { x: at.x + offset * 380, y: at.y }, style: { width: 340, height: 340 * ratio[1] / ratio[0] }, data: { kind: 'image', label: `生成中 ${index + 1}`, generatedSkill: source.data.canvasOperation ? builtinSkills[source.data.canvasOperation].name : tools.find(t=>t.id===source.data.tool)?.name || '图片生成', imagePresentationVersion: 1, localEdit: source.data.localEdit, pendingResult: { jobId: job, sourceNode: source.id, index, endpoint: source.data.tool === 'style' ? 'style' : 'images' } } }))]
+    return [...current, ...missing.map((index,offset): Card => ({ id: `skill-${job}-${index}`, type: 'card', position: { x: at.x + offset * 380, y: at.y }, style: { width: 340, height: 340 * ratio[1] / ratio[0] }, data: { kind: 'image', label: `生成中 ${index + 1}`, generatedSkill: imageOperationName(source.data) || '图像', imagePresentationVersion: 1, localEdit: source.data.localEdit, pendingResult: { jobId: job, sourceNode: source.id, index, endpoint: source.data.tool === 'style' ? 'style' : 'images' } } }))]
   }, [edges])
   useEffect(() => {
     if (!ready) return
@@ -569,7 +592,7 @@ function Workspace() {
     for (const result of images) {
       const img = new Image(); img.src = result.src
       try { await img.decode() } catch { continue }
-      results.push({ id: `skill-${job}-${result.index}`, type: 'card', position: { x: 0, y: 0 }, style: { width: 340, height: 340 * img.naturalHeight / img.naturalWidth }, data: { kind: 'image', generatedSkill: source.data.canvasOperation ? builtinSkills[source.data.canvasOperation].name : source.data.localEdit ? source.data.localEdit.kind==='material'?'材质优化':'模型替换' : tools.find(t=>t.id===source.data.tool)?.name || '图片生成', src: result.src, toneSettings: result.toneSettings, label: `${source.data.canvasOperation ? builtinSkills[source.data.canvasOperation].name : source.data.localEdit ? source.data.localEdit.kind === 'material' ? '材质优化' : '模型替换' : source.data.tool === 'texture-restore' ? '图片重绘' : source.data.tool === 'tone-skill' ? '场景调色' : source.data.tool === 'style' ? '风格转换' : source.data.tool === 'light' ? '光影优化' : '生图结果'} ${result.index + 1}`, dimensions: `${img.naturalWidth} × ${img.naturalHeight}`, version:{parentId:versionParent?.id,parentLabel:versionParent?.data.label,revision:(versionParent?.data.version?.revision || 0)+1}, imagePresentationVersion: 1, provenanceLinked: true, comparison: result.toneSettings?.base ? {original:result.toneSettings.base} : comparison, localEdit: source.data.localEdit, iterationContext: { modification: source.data.submittedRefinement?.jobId===job ? source.data.submittedRefinement.prompt : undefined, lighting: source.data.skillState?.lighting, tool: source.data.tool || 'redraw', prompt: source.data.localEdit?.supplement || source.data.skillState?.supplement || source.data.prompt || '', referenceIds: source.data.skillState?.referenceIds || (source.data.composerRequest ? source.data.composerRequest.referenceIds || (source.data.composerRequest.input ? [source.data.composerRequest.input.id] : []) : edges.filter(e => e.target === id && e.targetHandle === 'style').map(e => e.source)), options: source.data.skillState?.options || (source.data.tool === 'style' ? { model: 'doubao-seedream-5-0-pro-260628', resolution: '2K', ratio: 'auto', count: 4 } : source.data.generation || defaultGeneration) }, skillResult: { jobId: job, sourceNode: id, baseId, review: result.review } } })
+      results.push({ id: `skill-${job}-${result.index}`, type: 'card', position: { x: 0, y: 0 }, style: { width: 340, height: 340 * img.naturalHeight / img.naturalWidth }, data: { kind: 'image', generatedSkill: imageOperationName(source.data) || '图像', src: result.src, toneSettings: result.toneSettings, label: `${source.data.canvasOperation ? builtinSkills[source.data.canvasOperation].name : source.data.localEdit ? source.data.localEdit.kind === 'material' ? '材质优化' : '模型替换' : source.data.tool === 'texture-restore' ? '图片重绘' : source.data.tool === 'tone-skill' ? '场景调色' : source.data.tool === 'style' ? '风格转换' : source.data.tool === 'light' ? '光影优化' : '生图结果'} ${result.index + 1}`, dimensions: `${img.naturalWidth} × ${img.naturalHeight}`, version:{parentId:versionParent?.id,parentLabel:versionParent?.data.label,revision:(versionParent?.data.version?.revision || 0)+1}, imagePresentationVersion: 1, provenanceLinked: true, comparison: result.toneSettings?.base ? {original:result.toneSettings.base} : comparison, localEdit: source.data.localEdit, iterationContext: { modification: source.data.submittedRefinement?.jobId===job ? source.data.submittedRefinement.prompt : undefined, lighting: source.data.skillState?.lighting, tool: source.data.tool || 'redraw', prompt: source.data.localEdit?.supplement || source.data.skillState?.supplement || source.data.prompt || '', referenceIds: source.data.skillState?.referenceIds || (source.data.composerRequest ? source.data.composerRequest.referenceIds || (source.data.composerRequest.input ? [source.data.composerRequest.input.id] : []) : edges.filter(e => e.target === id && e.targetHandle === 'style').map(e => e.source)), options: source.data.skillState?.options || (source.data.tool === 'style' ? { model: 'doubao-seedream-5-0-pro-260628', resolution: '2K', ratio: 'auto', count: 4 } : source.data.generation || defaultGeneration) }, skillResult: { jobId: job, sourceNode: id, baseId, review: result.review } } })
     }
     if(epoch !== graphEpoch.current)return
     if(images.some(result=>result.review?.layer) && results.length){
