@@ -1,6 +1,6 @@
 export const MAX_CANVAS_IMAGE_EDGE = 4096
 
-// Original bytes remain the source of truth for downloads, export and generation.
+// Imported canvas images are capped at 4K, including stored/exported bytes.
 export async function prepareUploadedImage(file: File) {
   const bytes = new Uint8Array(await file.slice(0, 8).arrayBuffer())
   const png = bytes.length === 8 && [137, 80, 78, 71, 13, 10, 26, 10].every((v, i) => bytes[i] === v)
@@ -34,7 +34,7 @@ export async function prepareUploadedImage(file: File) {
         canvas.width = canvas.height = 0
       }
     }
-    return { src, previewSrc, width, height }
+    return { src: previewSrc || src, previewSrc: undefined, width: Math.min(width, Math.round(width * scale)), height: Math.min(height, Math.round(height * scale)) }
   } finally {
     image.removeAttribute('src')
   }

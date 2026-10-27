@@ -10,6 +10,7 @@ export function taskSummary(j){
  else if(j.status==='submit_error'||j.failure?.stage==='rejected')stage=`提交被 ${j.provider==='openlux'?'OpenLux':'DREO'} 拒绝 · 无任务号`
  else if(j.status==='submission_unknown'||j.submissionAttemptedAt||j.status==='submitting')stage='提交状态不确定 · 请核对 DREO'
  else if(j.failure?.stage==='before_submit'||j.deferredEdit||['analyzing','locating','composing','uploading','queued'].includes(j.status))stage='提交前 · '+(j.status==='paused'?'处理失败':'准备中')
+ if(j.type==='texture-preparation'&&!j.plan&&!j.lineJobId&&!j.finalId)stage='提交前 · 视觉分析'+(j.status==='paused'?'失败，尚未提交生图':'中')
  if(j.canvasSkill&&['local-vision','rembg'].includes(j.canvasSkill.processor)&&!j.taskId)stage='本地处理 · 无 DREO 任务'
  return {id:j.id,taskId:typeof j.taskId==='string'?j.taskId:undefined,feature:j.deferredEdit?.kind||j.canvasSkill?.name||j.feature||j.type,status:j.status,stage,message:safeTaskMessage(j.failure?.message||j.resultFailure?.message||j.message),createdAt:j.createdAt,updatedAt:j.updatedAt,remoteStatus:j.remoteStatus,phase:j.phase?.step,images:Array.isArray(j.images)?j.images.length:0,submittedAt:j.submissionAttemptedAt}
 }

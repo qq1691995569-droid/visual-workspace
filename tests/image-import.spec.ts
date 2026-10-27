@@ -1,6 +1,6 @@
 import {test, expect} from '@playwright/test'
 
-test('大图按显示尺寸加载预览，刷新和导出保留原始字节，拒绝其他格式', async ({page}) => {
+test('大图导入压缩到4K，刷新和导出保留压缩结果，拒绝其他格式', async ({page}) => {
   await page.goto('/')
   const original = await page.evaluate(() => {
     const canvas = document.createElement('canvas')
@@ -15,8 +15,8 @@ test('大图按显示尺寸加载预览，刷新和导出保留原始字节，�
   const image = page.locator('.image-body img').first()
   await expect(image).toBeVisible()
   await expect.poll(() => image.evaluate((el: HTMLImageElement) => [el.naturalWidth, el.naturalHeight])).toEqual([512, 256])
-  await expect(page.getByLabel('图片尺寸和比例')).toContainText('5000 × 2500 px')
-  await expect(page.getByLabel('图片尺寸和比例')).toHaveAttribute('title','预览 4096 × 2048 px')
+  await expect(page.getByLabel('图片尺寸和比例')).toContainText('4096 × 2048 px')
+
   const labelBox = await page.getByLabel('图片尺寸和比例').boundingBox()
   const imageBox = await image.boundingBox()
   expect(labelBox!.y).toBeGreaterThan(imageBox!.y); expect(labelBox!.y+labelBox!.height).toBeLessThanOrEqual(imageBox!.y+imageBox!.height+1)
@@ -31,8 +31,9 @@ test('大图按显示尺寸加载预览，刷新和导出保留原始字节，�
   const chunks: Buffer[] = []
   for await (const chunk of stream!) chunks.push(Buffer.from(chunk))
   const project = JSON.parse(Buffer.concat(chunks).toString())
-  expect(project.nodes[0].data.src).toBe(original)
-  expect(project.nodes[0].data.previewSrc).not.toBe(original)
+  expect(project.nodes[0].data.src).not.toBe(original)
+  expect(project.nodes[0].data.dimensions).toBe('4096 × 2048')
+  expect(project.nodes[0].data.previewSrc).toBeUndefined()
   // The preview's empty corner keeps the source alpha channel.
   expect(await image.evaluate((el: HTMLImageElement) => {
     const c = document.createElement('canvas'); c.width = c.height = 1
@@ -48,7 +49,7 @@ test('大图按显示尺寸加载预览，刷新和导出保留原始字节，�
   const imageStream = await (await imageDownload).createReadStream()
   const imageChunks: Buffer[] = []
   for await (const chunk of imageStream!) imageChunks.push(Buffer.from(chunk))
-  expect(Buffer.concat(imageChunks)).toEqual(Buffer.from(original.split(',')[1], 'base64'))
+  expect(Buffer.concat(imageChunks)).toEqual(Buffer.from(project.nodes[0].data.src.split(',')[1], 'base64'))
   await page.getByRole('button', {name:'关闭图片预览',exact:true}).click()
   await page.locator('input[type=file]').first().setInputFiles({name:'fake.jpg',mimeType:'image/jpeg',buffer:Buffer.from('GIF89a')})
   await expect(page.getByText(/目前仅支持 PNG、JPG 图片/)).toBeVisible()
@@ -68,7 +69,7 @@ test('JPG长边限制与小图保持原尺寸', async ({page}) => {
     }
     return [await create(2500, 5000), await create(1200, 800)]
   })
-  expect(result).toEqual([{width:2048,height:4096,hasPreview:true},{width:1200,height:800,hasPreview:false}])
+  expect(result).toEqual([{width:2048,height:4096,hasPreview:false},{width:1200,height:800,hasPreview:false}])
 })
 
 test('加入图像生成对话框时自动沿用原图比例', async ({page}) => {

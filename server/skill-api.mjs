@@ -1,3 +1,4 @@
+import {prepareVisionImages} from './vision-images.mjs'
 import {productAssessmentSchema,productAssessmentPrompt} from './scene-product-assessment-v1.mjs'
 import {textureRestore} from './texture-restore.mjs'
 import {liblibUpscale} from './liblib-upscale.mjs'
@@ -140,7 +141,8 @@ async function vision(system, images) {
   if (!visionConfigured()) throw Error('视觉分析接口未配置；请配置 CANVAS_VISION_ENDPOINT / TOKEN / MODEL，或导入已分析的 JSON 方案')
   const endpoint = new URL(visionSettings.endpoint)
   if (endpoint.protocol !== 'https:' && !['127.0.0.1', 'localhost'].includes(endpoint.hostname)) throw Error('视觉分析接口必须使用 HTTPS 或本机地址')
-  const messages=images.flatMap((image, i) => [{ type: 'text', text: i === 0 ? '底图（或原始场景）' : `参考/结果 ${i}` }, { type: 'image_url', image_url: { url: image } }])
+  const preparedImages=await prepareVisionImages(images)
+  const messages=preparedImages.flatMap((image, i) => [{ type: 'text', text: i === 0 ? '底图（或原始场景）' : `参考/结果 ${i}` }, { type: 'image_url', image_url: { url: image } }])
   async function request(extra=''){
    const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${visionSettings.token}` }, signal: AbortSignal.timeout(180000), redirect: 'error', body: JSON.stringify({ model: visionSettings.model, temperature: 0.1, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system + extra }, { role: 'user', content: messages }] }) })
    if (!res.ok) throw Error(`视觉分析失败（HTTP ${res.status}）`)
@@ -150,7 +152,8 @@ async function vision(system, images) {
    if(typeof content!=='string'||content.length>100000)throw Object.assign(Error('视觉接口未返回 JSON 内容'),{code:'VISION_INVALID_JSON'})
    return content
   }
-  const content=await request()
+  let content
+  try {content=await request()} catch(error) {if(error.name==='TimeoutError')throw Error('视觉分析超时（180 秒），请稍后重试或检查视觉分析服务');throw error}
   try{return parseVisionJson(content)}
   catch(error){
    if(error?.code!=='VISION_INVALID_JSON')throw error
